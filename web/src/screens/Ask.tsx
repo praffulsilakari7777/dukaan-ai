@@ -4,19 +4,13 @@ import { DraftCards, Sheet, WaCard } from '../components/ui';
 import { askDukaan, type AgentReply, type AgentStep, type OfferDraft } from '../lib/agent';
 import { inr, uid } from '../lib/ledger';
 import { drawPoster } from '../lib/offers';
+import { shareImage } from '../lib/share';
 import type { GeminiContent } from '../lib/api';
 import { useVoice } from '../lib/speech';
 import { useStore } from '../lib/store';
 import type { Draft } from '../lib/types';
 
-const SUGGESTIONS = [
-  { icon: Clock, q: "Who hasn't paid udhaar in 30 days, and what's running out?" },
-  { icon: TrendingUp, q: 'Which item made the most profit this week?' },
-  { icon: MessageCircle, q: 'Send reminders to everyone who owes me money' },
-  { icon: PackageSearch, q: 'Make a sugar and dal order for my supplier' },
-  { icon: Wand2, q: "What's expiring or not selling? Make an offer" },
-  { icon: Landmark, q: 'How much loan can I get, and can I afford it?' },
-];
+const SUGGESTION_ICONS = [Clock, TrendingUp, MessageCircle, PackageSearch, Wand2, Landmark];
 
 interface Turn {
   id: number;
@@ -125,15 +119,15 @@ export function AskSheet({ onClose, startVoice, initial }: { onClose: () => void
             <div className="orb">
               <Sparkles size={28} />
             </div>
-            <b>Your shop, answered.</b>
-            <p>Ask in any language. Dukaan checks your own ledger, then answers or drafts the message.</p>
+            <b>{t.askIntroTitle}</b>
+            <p>{t.askIntroSub}</p>
           </div>
           <div className="suggest">
-            {SUGGESTIONS.map(({ icon: I, q }) => (
+            {[t.sugg1, t.sugg2, t.sugg6, t.sugg3, t.sugg4, t.sugg5].map((q, i) => { const I = SUGGESTION_ICONS[i]; return (
               <button key={q} onClick={() => ask(q)}>
                 <I size={18} /> {q}
               </button>
-            ))}
+            ); })}
           </div>
           {voice.error && <div className="err">{voice.error}</div>}
         </>
@@ -208,7 +202,7 @@ export function AskSheet({ onClose, startVoice, initial }: { onClose: () => void
 }
 
 function OfferCard({ o }: { o: OfferDraft }) {
-  const { settings, addOffer, offers, toast } = useStore();
+  const { settings, addOffer, offers, toast, t } = useStore();
   const poster = drawPoster(o, settings.shopName);
   const live = offers.some((x) => x.item === o.item && x.headline === o.headline);
   return (
@@ -224,9 +218,9 @@ function OfferCard({ o }: { o: OfferDraft }) {
         </span>
         {o.reasoning && <p>{o.reasoning}</p>}
         <div className="oc-act">
-          <a className="btn wa sm" href={`https://wa.me/?text=${encodeURIComponent(o.whatsapp_message)}`} target="_blank" rel="noreferrer">
-            <Send size={14} /> WhatsApp
-          </a>
+          <button className="btn wa sm" onClick={() => shareImage(poster, o.whatsapp_message, `${o.item.toLowerCase().replace(/\s+/g, '-')}-offer.png`)}>
+            <Send size={14} /> {t.shareWa}
+          </button>
           <button
             className="btn primary sm"
             disabled={live}
@@ -235,7 +229,7 @@ function OfferCard({ o }: { o: OfferDraft }) {
               toast(`Offer live · ${o.headline}`);
             }}
           >
-            {live ? 'Live' : 'Start offer'}
+            {live ? '✓' : t.startOffer}
           </button>
         </div>
       </div>

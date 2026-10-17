@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { briefing, OfflineError } from '../lib/api';
 import { daysSince, fmtQty, inr, relTime, startOfDay } from '../lib/ledger';
 import { offerCandidates } from '../lib/offers';
+import { langInfo, tf } from '../lib/i18n';
 import { useSpeaker } from '../lib/speech';
 import { useStore } from '../lib/store';
 import type { Entry } from '../lib/types';
@@ -34,13 +35,13 @@ function offlineBriefing(s: ReturnType<typeof briefingSummary>, lang: string) {
   return `Good morning ${s.owner}. Yesterday you sold ${inr(s.yesterday.sales)} and made ${inr(s.yesterday.profit)} profit. ${low ? `${low} will run out soon, so place an order today.` : 'Your stock looks healthy.'} ${due ? `The biggest udhaar is ${due.name}, at ${inr(due.due)}.` : ''} Your Dukaan Score is ${s.dukaan_score}. Have a good day!`;
 }
 
-const SUGGESTED = ["Who hasn't paid in 30 days?", 'Which item made the most profit this week?', 'What should I reorder today?'];
 
 type OpenAsk = (voice?: boolean, q?: string) => void;
 
-export function Home({ go, openAdd, openAsk, openSettings }: { go: (t: Tab) => void; openAdd: () => void; openAsk: OpenAsk; openSettings: () => void }) {
+export function Home({ go, openAdd, openAsk, openSettings, openLang }: { go: (t: Tab) => void; openAdd: () => void; openAsk: OpenAsk; openSettings: () => void; openLang: () => void }) {
   const store = useStore();
-  const { ledger, t, settings, entries, updateSettings } = store;
+  const { ledger, t, settings, entries } = store;
+  const SUGGESTED = [t.sugg1, t.sugg2, t.sugg3];
   const [entry, setEntry] = useState<Entry | null>(null);
   const [script, setScript] = useState<string | null>(null);
   const [loadingBrief, setLoadingBrief] = useState(false);
@@ -63,7 +64,7 @@ export function Home({ go, openAdd, openAsk, openSettings }: { go: (t: Tab) => v
   const t0 = startOfDay();
   const groups: { label: string; items: Entry[] }[] = [];
   for (const e of recent) {
-    const label = e.ts >= t0 ? 'Today' : e.ts >= t0 - 86_400_000 ? 'Yesterday' : new Date(e.ts).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+    const label = e.ts >= t0 ? t.today : e.ts >= t0 - 86_400_000 ? t.yesterday : new Date(e.ts).toLocaleDateString(langInfo(settings.lang).bcp, { day: 'numeric', month: 'short' });
     const g = groups[groups.length - 1];
     if (g?.label === label) g.items.push(e);
     else groups.push({ label, items: [e] });
@@ -98,7 +99,7 @@ export function Home({ go, openAdd, openAsk, openSettings }: { go: (t: Tab) => v
             <b className="m-shop">{settings.shopName}</b>
           </div>
           <div className="m-actions">
-            <button className="ghost-icon" onClick={() => updateSettings({ lang: settings.lang === 'en' ? 'hi' : 'en' })} aria-label="Switch language">
+            <button className="ghost-icon" onClick={openLang} aria-label={t.chooseLanguage}>
               <Languages size={19} />
             </button>
             <button className="ghost-icon" onClick={openSettings} aria-label={t.settings}>
@@ -112,12 +113,12 @@ export function Home({ go, openAdd, openAsk, openSettings }: { go: (t: Tab) => v
             <div className="sum-label">
               <span>{t.todayProfit}</span>
               <span className="sum-live">
-                <i /> {now.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
+                <i /> {now.toLocaleDateString(langInfo(settings.lang).bcp, { weekday: 'short', day: 'numeric', month: 'short' })}
               </span>
             </div>
             <div className={`sum-value num${today.profit < 0 ? ' neg' : ''}`}>{inr(today.profit)}</div>
             <div className="sum-note">
-              From {today.count} {today.count === 1 ? 'entry' : 'entries'} today, after cost of goods and expenses
+              {tf(t.profitNote, { n: today.count })}
             </div>
             <dl className="sum-metrics">
               <div>
@@ -125,7 +126,7 @@ export function Home({ go, openAdd, openAsk, openSettings }: { go: (t: Tab) => v
                 <dd className="num">{inr(today.sales)}</dd>
               </div>
               <div>
-                <dt>Cash in</dt>
+                <dt>{t.cashIn}</dt>
                 <dd className="num">{inr(today.received)}</dd>
               </div>
               <div className="sum-link" role="button" tabIndex={0} onClick={() => go('khata')} onKeyDown={(e) => e.key === 'Enter' && go('khata')}>
@@ -146,7 +147,7 @@ export function Home({ go, openAdd, openAsk, openSettings }: { go: (t: Tab) => v
               </span>
               <div>
                 <b>{t.askTitle}</b>
-                <span>Your shop’s AI assistant, powered by Gemini</span>
+                <span>{t.askSub}</span>
               </div>
             </div>
             <div className="ask-input">
@@ -170,8 +171,8 @@ export function Home({ go, openAdd, openAsk, openSettings }: { go: (t: Tab) => v
 
         <section className="a-attn panel">
           <div className="block-head">
-            <h2>Needs attention</h2>
-            <span>{low.length + overdue.length + expiring.length ? `${(low.length ? 1 : 0) + overdue.length + (expiring.length ? 1 : 0)} to act on` : 'All clear'}</span>
+            <h2>{t.needsAttention}</h2>
+            <span>{low.length + overdue.length + expiring.length ? tf(t.toActOn, { n: (low.length ? 1 : 0) + overdue.length + (expiring.length ? 1 : 0) }) : t.allClear}</span>
           </div>
           <ul className="attn">
             {low.length > 0 && (
@@ -180,17 +181,11 @@ export function Home({ go, openAdd, openAsk, openSettings }: { go: (t: Tab) => v
                   <Package size={18} />
                 </span>
                 <div className="attn-main">
-                  <b>
-                    {low
-                      .slice(0, 2)
-                      .map((s) => s.name)
-                      .join(' and ')}
-                    {low.length > 2 ? ` +${low.length - 2} more` : ''} running low
-                  </b>
-                  <span>About {Math.max(Math.round(Math.min(...low.map((s) => (Number.isFinite(s.daysLeft) ? s.daysLeft : 0)))), 0)} days of stock left</span>
+                  <b>{tf(t.runningLow, { items: low.slice(0, 2).map((s) => s.name).join(', ') + (low.length > 2 ? ` +${low.length - 2}` : '') })}</b>
+                  <span>{tf(t.daysStockLeft, { n: Math.max(Math.round(Math.min(...low.map((s) => (Number.isFinite(s.daysLeft) ? s.daysLeft : 0)))), 0) })}</span>
                 </div>
                 <button className="attn-act" onClick={() => openAsk(false, 'Make a supplier order for the items running low')}>
-                  Order
+                  {t.order}
                 </button>
               </li>
             )}
@@ -200,17 +195,11 @@ export function Home({ go, openAdd, openAsk, openSettings }: { go: (t: Tab) => v
                   <CalendarClock size={18} />
                 </span>
                 <div className="attn-main">
-                  <b>
-                    {expiring
-                      .slice(0, 2)
-                      .map((c) => c.item)
-                      .join(' and ')}
-                    {expiring.length > 2 ? ` +${expiring.length - 2}` : ''} expiring soon
-                  </b>
-                  <span className="num">{inr(expiring.reduce((s, c) => s + c.atRiskValue, 0))} of stock at risk</span>
+                  <b>{tf(t.expiringSoon, { items: expiring.slice(0, 2).map((c) => c.item).join(', ') + (expiring.length > 2 ? ` +${expiring.length - 2}` : '') })}</b>
+                  <span className="num">{tf(t.stockAtRisk, { amt: inr(expiring.reduce((s, c) => s + c.atRiskValue, 0)) })}</span>
                 </div>
                 <button className="attn-act" onClick={() => go('offers')}>
-                  Offer
+                  {t.offer}
                 </button>
               </li>
             )}
@@ -220,13 +209,11 @@ export function Home({ go, openAdd, openAsk, openSettings }: { go: (t: Tab) => v
                   <Wallet size={18} />
                 </span>
                 <div className="attn-main">
-                  <b>
-                    {c.name} hasn’t paid in {Math.min(daysSince(c.lastPaymentTs || c.history[c.history.length - 1]?.ts || 0), 999)} days
-                  </b>
-                  <span className="num">{inr(c.due)} udhaar due</span>
+                  <b>{tf(t.notPaidIn, { name: c.name, n: Math.min(daysSince(c.lastPaymentTs || c.history[c.history.length - 1]?.ts || 0), 999) })}</b>
+                  <span className="num">{tf(t.udhaarDueAmt, { amt: inr(c.due) })}</span>
                 </div>
                 <button className="attn-act" onClick={() => openAsk(false, `Send ${c.name} a WhatsApp reminder for their udhaar`)}>
-                  Remind
+                  {t.remind}
                 </button>
               </li>
             ))}
@@ -246,7 +233,7 @@ export function Home({ go, openAdd, openAsk, openSettings }: { go: (t: Tab) => v
                     </span>
                   )}
                 </b>
-                <span>{loadingBrief ? 'Gemini is preparing your summary…' : 'A 30-second spoken summary of your shop'}</span>
+                <span>{loadingBrief ? t.briefLoading : t.briefSub}</span>
               </div>
               <button className="attn-act icon" onClick={playBriefing} disabled={loadingBrief} aria-label={speaker.speaking ? t.stop : t.play}>
                 {speaker.speaking ? <Pause size={16} /> : <Play size={16} />}
@@ -258,13 +245,13 @@ export function Home({ go, openAdd, openAsk, openSettings }: { go: (t: Tab) => v
 
         <section className="a-chart panel">
           <div className="block-head">
-            <h2>Sales, last 7 days</h2>
+            <h2>{t.sales7}</h2>
             <span className="num">{inr(weekSales)}</span>
           </div>
           <div className="chart-sel num" aria-live="polite">
             <b>{inr(day.sales)}</b>
             <span>
-              {sel === ledger.days.length - 1 ? 'Today so far' : new Date(day.day).toLocaleDateString('en-IN', { weekday: 'long' })} · {inr(day.profit)} profit
+              {sel === ledger.days.length - 1 ? t.todaySoFar : new Date(day.day).toLocaleDateString(langInfo(settings.lang).bcp, { weekday: 'long' })} · {inr(day.profit)} {t.profitWord}
             </span>
           </div>
           <div className="bars" role="group" aria-label="Daily sales">
@@ -275,7 +262,7 @@ export function Home({ go, openAdd, openAsk, openSettings }: { go: (t: Tab) => v
                   <div className="bar-track">
                     <div className={`bar${isToday ? ' today' : ''}`} style={{ height: `${Math.max((d.sales / max) * 100, 2)}%`, animationDelay: `${i * 40}ms` }} />
                   </div>
-                  <span className="bar-lbl">{isToday ? 'Today' : d.label}</span>
+                  <span className="bar-lbl">{isToday ? t.today : new Date(d.day).toLocaleDateString(langInfo(settings.lang).bcp, { weekday: 'short' })}</span>
                 </button>
               );
             })}

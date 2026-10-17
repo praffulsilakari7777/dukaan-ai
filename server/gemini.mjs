@@ -47,16 +47,18 @@ async function accessToken() {
   return cached.token;
 }
 
-export async function generate(body, { timeoutMs = 40_000 } = {}) {
+export const imageModel = process.env.GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image';
+
+export async function generate(body, { timeoutMs = 40_000, model: useModel = MODEL } = {}) {
   if (mode === 'none') throw Object.assign(new Error('Gemini is not configured'), { status: 503 });
   let url;
   const headers = { 'Content-Type': 'application/json' };
   if (mode === 'api-key') {
-    url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
+    url = `https://generativelanguage.googleapis.com/v1beta/models/${useModel}:generateContent`;
     headers['x-goog-api-key'] = API_KEY;
   } else {
     const host = LOCATION === 'global' ? 'aiplatform.googleapis.com' : `${LOCATION}-aiplatform.googleapis.com`;
-    url = `https://${host}/v1/projects/${PROJECT}/locations/${LOCATION}/publishers/google/models/${MODEL}:generateContent`;
+    url = `https://${host}/v1/projects/${PROJECT}/locations/${LOCATION}/publishers/google/models/${useModel}:generateContent`;
     headers.Authorization = `Bearer ${await accessToken()}`;
   }
   const ctrl = new AbortController();

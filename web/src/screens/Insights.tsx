@@ -110,7 +110,7 @@ export function Insights({ go }: { go: (t: Tab) => void }) {
                 <b className="num" style={{ color }}>
                   {score.value}
                 </b>
-                <span>of 900</span>
+                <span>{t.ofScore}</span>
               </div>
             </div>
             <div className="loan">
@@ -121,7 +121,7 @@ export function Insights({ go }: { go: (t: Tab) => void }) {
               <div className="k">{score.loan ? t.loanReady : t.notYet}</div>
               <div className="v num">{score.loan ? `up to ${inr(score.loan)}` : '—'}</div>
               <button className="btn primary sm" style={{ marginTop: 12 }} onClick={() => go('loans')}>
-                See loan offers
+                {t.seeLoans}
               </button>
             </div>
           </div>
@@ -230,7 +230,7 @@ export function Insights({ go }: { go: (t: Tab) => void }) {
       <section className="section a-tips">
         <div className="section-head">
           <h2>{t.aiTips}</h2>
-          {ai && <span className="aside-txt">{ai.by === 'gemini' ? 'by Gemini' : 'offline'}</span>}
+          {ai && <span className="aside-txt">{ai.by === 'gemini' ? 'Gemini' : t.offline}</span>}
         </div>
         <ol className="tips">
           {(ai?.tips ?? [0, 1, 2, 3].map(() => '')).map((tip, i) => (

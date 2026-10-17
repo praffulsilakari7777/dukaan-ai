@@ -3,7 +3,16 @@ import { createReadStream, existsSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { generate, generateJSON, mode, model } from './gemini.mjs';
+import { generate, generateJSON, imageModel, mode, model } from './gemini.mjs';
+
+// How Gemini is told to write for each app language.
+const LANG_AI = {
+  en: 'simple Indian English', hi: 'simple Hindi in Devanagari script', hinglish: 'simple Hinglish (Hindi written in Roman script)',
+  bn: 'simple Bengali in Bengali script', te: 'simple Telugu in Telugu script', mr: 'simple Marathi in Devanagari script',
+  ta: 'simple Tamil in Tamil script', gu: 'simple Gujarati in Gujarati script', kn: 'simple Kannada in Kannada script',
+  ml: 'simple Malayalam in Malayalam script', pa: 'simple Punjabi in Gurmukhi script', or: 'simple Odia in Odia script',
+};
+const langName = (code) => LANG_AI[code] || LANG_AI.en;
 
 const PORT = Number(process.env.PORT || 8080);
 const ROOT = fileURLToPath(new URL('.', import.meta.url));
@@ -121,7 +130,7 @@ function agentSystem(b) {
 You can read the shop's live ledger only through your tools. Never guess numbers: call a tool, then answer from its result.
 Use several tools in one turn when the question has several parts. When asked to send, remind, order or promote, draft the messages with the draft_* tools (the owner sends them with one tap; you never send anything yourself).
 Known items: ${(b.items || []).slice(0, 60).join(', ') || 'none yet'}. Known customers: ${(b.customers || []).slice(0, 40).join(', ') || 'none yet'}.
-Answer in the owner's language: if they write Hinglish or Hindi, reply in simple Hinglish; otherwise in plain English. ${b.lang === 'hi' ? 'The app is set to Hinglish.' : ''}
+The app is set to ${langName(b.lang)}: answer in that language, unless the owner clearly writes in another language, then match them. Keep item names, numbers and ₹ amounts as digits. WhatsApp drafts for customers may stay in Hinglish if the app is in English.
 Be brief: 1–3 short sentences, numbers first, rupees as ₹ with Indian grouping (₹1,25,000). No markdown headings or tables.`;
 }
 
@@ -170,9 +179,8 @@ const routes = {
   },
 
   async 'POST /api/insights'(b) {
-    const hi = b.lang === 'hi';
     return generateJSON({
-      system: `You are a small-business advisor and credit analyst for Indian kirana shops. Use only the numbers given. Write ${hi ? 'in simple Hinglish (Roman script)' : 'in plain, warm English a shopkeeper understands'}. No jargon.`,
+      system: `You are a small-business advisor and credit analyst for Indian kirana shops. Use only the numbers given. Write in ${langName(b.lang)} that a shopkeeper understands. No jargon. Keep numbers as digits.`,
       parts: [
         {
           text: `Shop data (JSON): ${JSON.stringify(b.summary)}
@@ -188,10 +196,9 @@ Return:
   },
 
   async 'POST /api/offer'(b) {
-    const hi = b.lang === 'hi';
     return generateJSON({
       system: `You are a retail merchandising expert for Indian kirana shops. You design one offer to clear at-risk stock while protecting the shop's money.
-Rules: expiring stock should be cleared before the date, so price it to sell in time; only go below cost if it expires within 2 days, and say so. For slow, non-perishable stock prefer a combo with a fast-selling item over a deep discount. Round prices to whole rupees. ${hi ? 'Write the WhatsApp message in simple Hinglish (Roman script) and everything else in simple English.' : 'Write the WhatsApp message in friendly Hinglish (Roman script) that customers in a small Indian town read easily; everything else in plain English.'}`,
+Rules: expiring stock should be cleared before the date, so price it to sell in time; only go below cost if it expires within 2 days, and say so. For slow, non-perishable stock prefer a combo with a fast-selling item over a deep discount. Round prices to whole rupees. Write the headline, tagline and reasoning in ${langName(b.lang)}. Write the WhatsApp message in ${b.lang === 'en' ? 'friendly Hinglish (Roman script) that customers in a small Indian town read easily' : langName(b.lang)}.`,
       parts: [{ text: `Shop: ${b.shop}\nAt-risk item (JSON): ${JSON.stringify(b.candidate)}\nFast-selling items to pair with: ${(b.fast_movers || []).join(', ') || 'none'}\nDesign the offer.` }],
       schema: {
         type: 'OBJECT',
@@ -212,10 +219,27 @@ Rules: expiring stock should be cleared before the date, so price it to sell in 
     });
   },
 
+  async 'POST /api/offer-image'(b) {
+    const o = b.offer || {};
+    const lang = langName(b.lang);
+    const prompt = `Create a square 1:1 promotional poster that an Indian kirana (neighbourhood grocery) shop will share on WhatsApp.
+Product: ${o.item}. Offer: ${o.headline}. Offer price: ₹${o.offer_price} per ${o.unit}${o.bundle_with ? `, combined with ${o.bundle_with}` : ''}. Valid: ${o.valid_days <= 1 ? 'today only' : `${o.valid_days} days`}.
+Shop name: ${b.shop}.
+Style: bright, clean and appetising, a realistic photo of fresh ${o.item} as the hero, warm Indian market feel, deep teal and marigold accent colours, plenty of space around the text.
+Text on the poster, large and perfectly spelled, and nothing else: the shop name at the top; the offer headline "${o.headline}"; the price "₹${o.offer_price}"; ${o.discount_pct ? `a round badge "${o.discount_pct}% OFF"` : 'a badge "COMBO"'}. ${b.lang && b.lang !== 'en' && b.lang !== 'hinglish' ? `Add one short line in ${lang} under the headline.` : ''}
+No logos, no QR codes, no phone numbers, no extra words.`;
+    const content = await generate(
+      { contents: [{ role: 'user', parts: [{ text: prompt }] }], generationConfig: { responseModalities: ['TEXT', 'IMAGE'], imageConfig: { aspectRatio: '1:1' } } },
+      { model: imageModel, timeoutMs: 90_000 },
+    );
+    const img = content.parts.find((p) => p.inlineData?.data);
+    if (!img) throw Object.assign(new Error('Gemini returned no image'), { status: 502 });
+    return { mime: img.inlineData.mimeType || 'image/png', data: img.inlineData.data, model: imageModel };
+  },
+
   async 'POST /api/loan-advice'(b) {
-    const hi = b.lang === 'hi';
     return generateJSON({
-      system: `You are a responsible micro-lending advisor for an Indian kirana shop owner. Recommend the loan that fits the shop's cash flow: daily repayment should stay under about 25% of average daily profit. Mention udhaar if collecting it would reduce borrowing. Only recommend offers marked eligible. Speak ${hi ? 'in simple Hinglish (Roman script)' : 'in plain, warm English'}; rupees as ₹ with Indian grouping.`,
+      system: `You are a responsible micro-lending advisor for an Indian kirana shop owner. Recommend the loan that fits the shop's cash flow: daily repayment should stay under about 25% of average daily profit. Mention udhaar if collecting it would reduce borrowing. Only recommend offers marked eligible, preferring the one in selected_offer when it fits. Write in ${langName(b.lang)}; rupees as ₹ with Indian grouping.`,
       parts: [{ text: `Shop data (JSON): ${JSON.stringify(b)}` }],
       schema: {
         type: 'OBJECT',
@@ -233,9 +257,8 @@ Rules: expiring stock should be cleared before the date, so price it to sell in 
   },
 
   async 'POST /api/briefing'(b) {
-    const hi = b.lang === 'hi';
     return generateJSON({
-      system: `You write a spoken 30-second morning briefing for a kirana shop owner, to be read aloud by text-to-speech. ${hi ? 'Write in simple Hinglish (Roman script).' : 'Write in warm, simple English.'} No lists, no symbols other than ₹, no markdown. 4–6 short sentences.`,
+      system: `You write a spoken 30-second morning briefing for a kirana shop owner, to be read aloud by text-to-speech. Write in warm, ${langName(b.lang)}. No lists, no symbols other than ₹, no markdown. 4–6 short sentences.`,
       parts: [{ text: `Data: ${JSON.stringify(b.summary)}\nGreet the owner by name, then: yesterday's sales and profit, what to reorder today, the biggest udhaar to collect, and one encouraging line.` }],
       schema: { type: 'OBJECT', properties: { script: { type: 'STRING' } }, required: ['script'] },
       temperature: 0.6,

@@ -1,6 +1,7 @@
 import { ChevronRight, Package, Search, Tag } from 'lucide-react';
 import type { Tab } from '../App';
 import { offerCandidates } from '../lib/offers';
+import { tf } from '../lib/i18n';
 import { useState } from 'react';
 import { fmtQty, inr } from '../lib/ledger';
 import { useStore } from '../lib/store';
@@ -41,13 +42,13 @@ export function Stock({ openAdd, go }: { openAdd: () => void; go: (t: Tab) => vo
               <Tag size={18} />
             </span>
             <span className="risk-txt">
-              <b className="num">{inr(riskValue)} of stock at risk</b>
+              <b className="num">{tf(t.stockAtRisk, { amt: inr(riskValue) })}</b>
               <span>
                 {risk
                   .slice(0, 3)
                   .map((c) => c.item)
                   .join(', ')}
-                {risk.length > 3 ? ` +${risk.length - 3}` : ''} · expiring or not selling. Let AI create offers.
+                {risk.length > 3 ? ` +${risk.length - 3}` : ''} · {t.riskSub}
               </span>
             </span>
             <ChevronRight size={18} />
@@ -59,7 +60,7 @@ export function Stock({ openAdd, go }: { openAdd: () => void; go: (t: Tab) => vo
         <div className="constrain">
         <label className="search">
           <Search size={18} />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search items" aria-label="Search items" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={t.searchItems} aria-label={t.searchItems} />
         </label>
         </div>
       )}
@@ -86,12 +87,12 @@ export function Stock({ openAdd, go }: { openAdd: () => void; go: (t: Tab) => vo
               <thead>
                 <tr>
                   <th>Item</th>
-                  <th className="r">In stock</th>
+                  <th className="r">{t.stock}</th>
                   <th>Cover</th>
-                  <th className="r">Avg cost</th>
-                  <th className="r">Sells at</th>
-                  <th className="r">Margin</th>
-                  <th className="r">Value</th>
+                  <th className="r">{t.avgCost}</th>
+                  <th className="r">{t.sells}</th>
+                  <th className="r">{t.margin}</th>
+                  <th className="r">{t.stockValue}</th>
                   <th className="r">Status</th>
                 </tr>
               </thead>
@@ -119,7 +120,7 @@ export function Stock({ openAdd, go }: { openAdd: () => void; go: (t: Tab) => vo
                       <td className="r num">{inr(s.value)}</td>
                       <td className="r">
                         <span className={`pill ${out || s.low ? 'bad' : 'good'}`}>
-                          {out ? t.out : s.low ? `${t.low} · ${Math.max(Math.round(s.daysLeft), 0)}d` : s.daily ? 'Daily' : Number.isFinite(s.daysLeft) ? `${Math.round(s.daysLeft)} ${t.daysLeft}` : t.ok}
+                          {out ? t.out : s.low ? `${t.low} · ${Math.max(Math.round(s.daysLeft), 0)}d` : s.daily ? t.daily : Number.isFinite(s.daysLeft) ? `${Math.round(s.daysLeft)} ${t.daysLeft}` : t.ok}
                         </span>
                       </td>
                     </tr>
@@ -151,7 +152,7 @@ export function Stock({ openAdd, go }: { openAdd: () => void; go: (t: Tab) => vo
                       </div>
                       <div style={{ marginTop: 4 }}>
                         <span className={`pill ${out ? 'bad' : s.low ? 'bad' : 'good'}`}>
-                          {out ? t.out : s.low ? `${t.low} · ${Math.max(Math.round(s.daysLeft), 0)}d` : s.daily ? 'Daily' : Number.isFinite(s.daysLeft) ? `${Math.round(s.daysLeft)} ${t.daysLeft}` : t.ok}
+                          {out ? t.out : s.low ? `${t.low} · ${Math.max(Math.round(s.daysLeft), 0)}d` : s.daily ? t.daily : Number.isFinite(s.daysLeft) ? `${Math.round(s.daysLeft)} ${t.daysLeft}` : t.ok}
                         </span>
                       </div>
                     </div>

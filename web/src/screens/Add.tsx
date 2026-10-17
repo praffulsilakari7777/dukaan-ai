@@ -6,6 +6,7 @@ import { inr } from '../lib/ledger';
 import { drawSampleBill, sampleBillDrafts, SAMPLE_SUPPLIER } from '../lib/sampleBill';
 import { useVoice } from '../lib/speech';
 import { useStore } from '../lib/store';
+import { tf } from '../lib/i18n';
 import type { Draft, EntrySource } from '../lib/types';
 
 const EXAMPLES = [
@@ -129,9 +130,7 @@ export function AddSheet({ onClose }: { onClose: () => void }) {
             <Sparkles size={18} />
           </span>
           <div>
-            <b>
-              {drafts.length} entr{drafts.length === 1 ? 'y' : 'ies'} understood
-            </b>
+            <b>{tf(t.understood, { n: drafts.length })}</b>
             <span>
               {t.checkSub} {by === 'offline' && '· offline parser'}
             </span>
@@ -163,7 +162,7 @@ export function AddSheet({ onClose }: { onClose: () => void }) {
             </button>
             <div className="hint">{busy ? t.understanding : voice.listening ? t.listening : t.tapToSpeak}</div>
             <div className={`transcript${voice.transcript || said ? '' : ' dim'}`} aria-live="polite">
-              {voice.transcript || (busy ? `“${said}”` : 'Hindi, Hinglish, English and 5 more languages')}
+              {voice.transcript || (busy ? `“${said}”` : t.voiceLangsNote)}
             </div>
           </div>
           {(voice.error || error) && <div className="err">{voice.error ?? error}</div>}
@@ -214,8 +213,8 @@ export function AddSheet({ onClose }: { onClose: () => void }) {
               <div className="ic">
                 <FileImage size={28} />
               </div>
-              <b style={{ display: 'block', fontSize: 15, marginBottom: 4 }}>Photograph a supplier bill</b>
-              <p>Gemini reads every line item and adds it to your stock as a purchase.</p>
+              <b style={{ display: 'block', fontSize: 15, marginBottom: 4 }}>{t.billTitle}</b>
+              <p>{t.billSub}</p>
               <div className="bill-actions">
                 <button className="btn primary" onClick={() => camRef.current?.click()}>
                   <Camera size={18} /> {t.takePhoto}

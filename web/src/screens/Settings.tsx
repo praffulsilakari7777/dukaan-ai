@@ -2,11 +2,14 @@ import { Database, RotateCcw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Sheet } from '../components/ui';
 import { health } from '../lib/api';
-import { VOICE_LANGS } from '../lib/i18n';
+import { LANGS, VOICE_LANGS } from '../lib/i18n';
+import type { Lang } from '../lib/types';
+import { useSetLanguage } from '../components/LanguagePicker';
 import { useStore } from '../lib/store';
 
 export function SettingsSheet({ onClose }: { onClose: () => void }) {
   const { t, settings, updateSettings, loadDemo, reset, toast } = useStore();
+  const setLang = useSetLanguage();
   const [ai, setAi] = useState<{ gemini: boolean; model?: string } | null>(null);
   useEffect(() => {
     health().then(setAi);
@@ -28,17 +31,16 @@ export function SettingsSheet({ onClose }: { onClose: () => void }) {
         <span>{t.ownerName}</span>
         <input className="input" value={settings.ownerName} onChange={(e) => updateSettings({ ownerName: e.target.value })} />
       </label>
-      <div className="field">
+      <label className="field">
         <span>{t.language}</span>
-        <div className="seg" style={{ margin: 0 }}>
-          <button className={settings.lang === 'en' ? 'on' : ''} onClick={() => updateSettings({ lang: 'en' })}>
-            English
-          </button>
-          <button className={settings.lang === 'hi' ? 'on' : ''} onClick={() => updateSettings({ lang: 'hi' })}>
-            Hinglish
-          </button>
-        </div>
-      </div>
+        <select className="input" value={settings.lang} onChange={(e) => setLang(e.target.value as Lang)}>
+          {LANGS.map((l) => (
+            <option key={l.code} value={l.code}>
+              {l.native} · {l.english}
+            </option>
+          ))}
+        </select>
+      </label>
       <label className="field">
         <span>{t.voiceLang}</span>
         <select className="input" value={settings.voiceLang} onChange={(e) => updateSettings({ voiceLang: e.target.value })}>

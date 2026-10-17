@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { demoEntries } from './demo';
-import { strings, type Strings } from './i18n';
+import { ensureFont, langInfo, strings, type Strings } from './i18n';
 import { buildLedger, keyOf, uid, type Ledger } from './ledger';
 import type { LoanApplication } from './lending';
 import type { ActiveOffer } from './offers';
@@ -16,13 +16,15 @@ interface Persisted {
   loans: LoanApplication[];
 }
 
-const DEFAULT_SETTINGS: Settings = { shopName: 'Sharma Kirana Store', ownerName: 'Ramesh', lang: 'en', voiceLang: 'hi-IN', model: 'gemini-2.5-flash' };
+const DEFAULT_SETTINGS: Settings = { shopName: 'Sharma Kirana Store', ownerName: 'Ramesh', lang: 'en', voiceLang: 'hi-IN', model: 'gemini-2.5-flash', v: 2 };
 
 function load(): Persisted {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const p = JSON.parse(raw) as Persisted;
+      // Before v2, 'hi' meant Hinglish in Roman script.
+      if (p.settings && !p.settings.v) p.settings = { ...p.settings, lang: (p.settings.lang as string) === 'hi' ? 'hinglish' : p.settings.lang, v: 2 };
       return { entries: p.entries ?? [], phones: p.phones ?? {}, settings: { ...DEFAULT_SETTINGS, ...p.settings }, offers: p.offers ?? [], loans: p.loans ?? [] };
     }
   } catch {
@@ -62,6 +64,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       /* private mode: keep working in memory */
     }
   }, [data]);
+
+  useEffect(() => {
+    ensureFont(data.settings.lang);
+    document.documentElement.lang = langInfo(data.settings.lang).bcp.slice(0, 2);
+  }, [data.settings.lang]);
 
   const ledger = useMemo(() => buildLedger(data.entries, data.phones), [data.entries, data.phones]);
 

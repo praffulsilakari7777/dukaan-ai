@@ -4,6 +4,7 @@ import { initials, Sheet } from '../components/ui';
 import { waLink } from '../lib/agent';
 import { daysSince, inr, relTime } from '../lib/ledger';
 import { useStore } from '../lib/store';
+import { tf } from '../lib/i18n';
 import { useWide } from '../lib/useWide';
 import type { Customer } from '../lib/types';
 
@@ -49,13 +50,13 @@ export function Khata() {
                       <div className="main">
                         <div className="t">{c.name}</div>
                         <div className="s">
-                          {c.lastPaymentTs ? `${t.lastPaid} ${relTime(c.lastPaymentTs).toLowerCase()}` : c.due > 0 ? `Never paid · ${since} days` : 'Settled'}
+                          {c.lastPaymentTs ? `${t.lastPaid} ${relTime(c.lastPaymentTs).toLowerCase()}` : c.due > 0 ? `${t.neverPaid} · ${since}` : t.clear}
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
                         <div className={`amt num${c.due > 0 ? ' out' : ''}`}>{inr(Math.max(c.due, 0))}</div>
                         <div style={{ marginTop: 4 }}>
-                          <span className={`pill ${c.due > 0 ? (since >= 30 ? 'bad' : 'warn') : 'good'}`}>{c.due > 0 ? (since >= 30 ? `${since}d overdue` : t.lenaHai) : t.clear}</span>
+                          <span className={`pill ${c.due > 0 ? (since >= 30 ? 'bad' : 'warn') : 'good'}`}>{c.due > 0 ? (since >= 30 ? tf(t.overdueDays, { n: since }) : t.lenaHai) : t.clear}</span>
                         </div>
                       </div>
                     </button>
@@ -109,7 +110,7 @@ function CustomerDetail({ c }: { c: Customer }) {
         <span className="avatar lg">{initials(c.name)}</span>
         <div>
           <h2>{c.name}</h2>
-          <span>{c.history.length} entries in khata</span>
+          <span>{t.history} · {c.history.length}</span>
         </div>
       </div>
       <div className="balance">
@@ -160,7 +161,7 @@ function CustomerDetail({ c }: { c: Customer }) {
           {c.history.map((h) => (
             <li key={h.id} className="row">
               <div className="main">
-                <div className="t">{h.kind === 'payment' ? `${t.jama} · paid` : h.label}</div>
+                <div className="t">{h.kind === 'payment' ? t.jama : h.label}</div>
                 <div className="s">{new Date(h.ts).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
               </div>
               <div className={`amt num ${h.kind === 'payment' ? 'in' : 'out'}`}>

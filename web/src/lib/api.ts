@@ -125,3 +125,4 @@ export async function resizeImage(file: Blob, max = 1400): Promise<string> {
 
 export const generateOffer = (body: unknown) => post<import('./offers').OfferPlan>('offer', body);
 export const loanAdvice = (body: unknown) => post<{ amount: number; months: number; productId: string; summary: string; risk: string }>('loan-advice', body);
+export const offerImage = (body: unknown) => post<{ mime: string; data: string; model: string }>('offer-image', body, 95_000);

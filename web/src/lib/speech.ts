@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { langInfo } from './i18n';
+import type { Lang } from './types';
 
 type Recognition = {
   lang: string;
@@ -73,11 +75,11 @@ export function useVoice(lang: string, onFinal: (text: string) => void) {
 /** Reads text aloud with the device's Indian voice when one exists. */
 export function useSpeaker() {
   const [speaking, setSpeaking] = useState(false);
-  const speak = useCallback((text: string, lang: 'en' | 'hi') => {
+  const speak = useCallback((text: string, lang: Lang) => {
     if (!('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text.replace(/₹/g, 'rupees ').replace(/[•*_#]/g, ''));
-    const want = lang === 'hi' ? 'hi-IN' : 'en-IN';
+    const want = langInfo(lang).bcp;
     const voices = window.speechSynthesis.getVoices();
     u.voice = voices.find((v) => v.lang === want) ?? voices.find((v) => v.lang.startsWith(want.slice(0, 2))) ?? null;
     u.lang = want;

@@ -5,17 +5,18 @@ import { loanAdvice, OfflineError } from '../lib/api';
 import { inr, uid } from '../lib/ledger';
 import { avgDailyProfit, loanOffers, offlineAdvice, PURPOSES, quote, statusOf, type Advice, type LoanApplication, type LoanStatus, type Offer } from '../lib/lending';
 import { useStore } from '../lib/store';
+import { tf } from '../lib/i18n';
 
-const STEPS: { id: LoanStatus; label: string; sub: string }[] = [
-  { id: 'submitted', label: 'Application sent', sub: 'Shared through Account Aggregator' },
-  { id: 'review', label: 'Lender reviewing', sub: 'Checking your Dukaan records' },
-  { id: 'approved', label: 'Approved', sub: 'Terms locked in' },
-  { id: 'disbursed', label: 'Money in your UPI', sub: 'Repayments start tomorrow' },
+const STEPS: { id: LoanStatus; label: 'stepSent' | 'stepReview' | 'stepApproved' | 'stepPaid'; sub: string }[] = [
+  { id: 'submitted', label: 'stepSent', sub: 'Account Aggregator' },
+  { id: 'review', label: 'stepReview', sub: 'Dukaan records' },
+  { id: 'approved', label: 'stepApproved', sub: '✓' },
+  { id: 'disbursed', label: 'stepPaid', sub: 'UPI' },
 ];
 const ORDER: LoanStatus[] = ['submitted', 'review', 'approved', 'disbursed'];
 
 export function Loans({ back }: { back?: () => void }) {
-  const { ledger, loans } = useStore();
+  const { ledger, loans, t } = useStore();
   const offers = useMemo(() => loanOffers(ledger), [ledger]);
   const [pick, setPick] = useState<string>(() => offers.find((o) => o.eligible)?.p.id ?? offers[0].p.id);
   const offer = offers.find((o) => o.p.id === pick)!;
@@ -38,32 +39,32 @@ export function Loans({ back }: { back?: () => void }) {
       <header className="page-head">
         {back && (
           <button className="back only-narrow" onClick={back}>
-            <ArrowLeft size={18} /> Insights
+            <ArrowLeft size={18} /> {t.insights}
           </button>
         )}
-        <h1 className="only-narrow">Loans</h1>
+        <h1 className="only-narrow">{t.loans}</h1>
       </header>
 
       <div className="loans">
         <section className="loan-hero a-lhero">
           <div className="lh-score">
-            <span>Dukaan Score</span>
+            <span>{t.score}</span>
             <b className="num" style={{ color }}>
               {score.value}
             </b>
-            <small>of 900</small>
+            <small>{t.ofScore}</small>
           </div>
           <div className="lh-main">
-            <span className="lh-k">{best ? 'Pre-approved up to' : 'Not eligible yet'}</span>
+            <span className="lh-k">{best ? t.preApproved : t.notEligible}</span>
             <b className="num">{best ? inr(best) : '—'}</b>
-            <span className="lh-sub">Based on your last 30 days of sales, udhaar collection and profit, all recorded in Dukaan AI.</span>
+            <span className="lh-sub">{t.basedOn}</span>
           </div>
         </section>
 
         {active && (
           <section className="panel a-status">
             <div className="block-head">
-              <h2>Your application</h2>
+              <h2>{t.yourApplication}</h2>
               <span className="num">
                 {inr(active.amount)} · {active.lender}
               </span>
@@ -77,7 +78,7 @@ export function Loans({ back }: { back?: () => void }) {
                   <li key={s.id} className={state}>
                     <span className="dot">{state === 'done' ? <Check size={13} strokeWidth={3} /> : state === 'now' ? <Clock size={13} /> : null}</span>
                     <div>
-                      <b>{s.label}</b>
+                      <b>{t[s.label]}</b>
                       <span>{s.id === 'disbursed' && state === 'done' ? `${inr(active.amount)} credited · ${inr(active.daily)}/day from tomorrow` : s.sub}</span>
                     </div>
                   </li>
@@ -89,8 +90,8 @@ export function Loans({ back }: { back?: () => void }) {
 
         <section className="a-offers">
           <div className="section-head" style={{ margin: '0 4px 10px' }}>
-            <h2>Offers for you</h2>
-            <span className="aside-txt">Demo partners</span>
+            <h2>{t.offersForYou}</h2>
+            <span className="aside-txt">{t.demoPartners}</span>
           </div>
           <div className="lenders">
             {offers.map((o) => (
@@ -105,7 +106,7 @@ export function Loans({ back }: { back?: () => void }) {
                   </div>
                   {o.eligible ? (
                     <span className="pill good">
-                      <BadgeCheck size={12} /> Eligible
+                      <BadgeCheck size={12} /> {t.eligible}
                     </span>
                   ) : (
                     <span className="pill neutral">
@@ -115,15 +116,15 @@ export function Loans({ back }: { back?: () => void }) {
                 </div>
                 <dl className="lender-terms num">
                   <div>
-                    <dt>Up to</dt>
+                    <dt>{t.upTo}</dt>
                     <dd>{inr(o.limit)}</dd>
                   </div>
                   <div>
-                    <dt>Interest</dt>
+                    <dt>{t.interest}</dt>
                     <dd>{o.rate}% p.a.</dd>
                   </div>
                   <div>
-                    <dt>Tenure</dt>
+                    <dt>{t.tenure}</dt>
                     <dd>
                       {o.p.tenures[0]}–{o.p.tenures[o.p.tenures.length - 1]} mo
                     </dd>
@@ -146,7 +147,7 @@ export function Loans({ back }: { back?: () => void }) {
 }
 
 function Calculator({ offer }: { offer: Offer }) {
-  const { ledger, settings, applyLoan, toast, loans } = useStore();
+  const { ledger, settings, applyLoan, toast, loans, t } = useStore();
   const min = 10_000;
   const [amount, setAmount] = useState(Math.min(Math.max(Math.round(offer.limit / 2 / 5000) * 5000, min), offer.limit));
   const [months, setMonths] = useState(offer.p.tenures[Math.min(1, offer.p.tenures.length - 1)]);
@@ -203,12 +204,12 @@ function Calculator({ offer }: { offer: Offer }) {
   return (
     <section className="panel a-calc">
       <div className="block-head">
-        <h2>Plan your loan</h2>
+        <h2>{t.planLoan}</h2>
         <span>{offer.p.lender}</span>
       </div>
 
       <div className="calc-amount num">
-        <span>Amount</span>
+        <span>{t.amount}</span>
         <b>{inr(amount)}</b>
       </div>
       <input type="range" className="range" min={min} max={offer.limit} step={5000} value={amount} onChange={(e) => setAmount(Number(e.target.value))} aria-label="Loan amount" style={{ ['--p' as string]: `${((amount - min) / Math.max(offer.limit - min, 1)) * 100}%` }} />
@@ -219,7 +220,7 @@ function Calculator({ offer }: { offer: Offer }) {
 
       <div className="calc-row">
         <div className="field" style={{ margin: 0, flex: 1 }}>
-          <span>Repay over</span>
+          <span>{t.repayOver}</span>
           <div className="seg" style={{ margin: 0, gridTemplateColumns: `repeat(${offer.p.tenures.length}, 1fr)` }}>
             {offer.p.tenures.map((m) => (
               <button key={m} className={m === months ? 'on' : ''} onClick={() => setMonths(m)}>
@@ -229,7 +230,7 @@ function Calculator({ offer }: { offer: Offer }) {
           </div>
         </div>
         <label className="field" style={{ margin: 0, flex: 1 }}>
-          <span>For</span>
+          <span>{t.forPurpose}</span>
           <select className="input" value={purpose} onChange={(e) => setPurpose(e.target.value)}>
             {PURPOSES.map((p) => (
               <option key={p}>{p}</option>
@@ -240,26 +241,26 @@ function Calculator({ offer }: { offer: Offer }) {
 
       <dl className="calc-out num">
         <div className="hl">
-          <dt>{offer.p.daily ? 'Daily repayment' : 'Monthly EMI'}</dt>
+          <dt>{offer.p.daily ? t.dailyRepay : t.monthlyEmi}</dt>
           <dd>{inr(offer.p.daily ? q.daily : q.emi)}</dd>
         </div>
         <div>
-          <dt>{offer.p.daily ? 'Monthly' : 'Per day'}</dt>
+          <dt>{offer.p.daily ? t.monthly : t.perDay}</dt>
           <dd>{inr(offer.p.daily ? q.emi : q.daily)}</dd>
         </div>
         <div>
-          <dt>Total interest</dt>
+          <dt>{t.totalInterest}</dt>
           <dd>{inr(q.totalInterest)}</dd>
         </div>
         <div>
-          <dt>Processing fee</dt>
+          <dt>{t.fee}</dt>
           <dd>{inr(q.fee)}</dd>
         </div>
       </dl>
 
       <div className={`afford ${tone}`}>
         <div className="afford-top">
-          <span>Repayment vs your daily profit</span>
+          <span>{t.vsProfit}</span>
           <b className="num">{burdenPct}%</b>
         </div>
         <div className="meter">
@@ -274,7 +275,7 @@ function Calculator({ offer }: { offer: Offer }) {
         {advice ? (
           <>
             <div className="advisor-head">
-              <Sparkles size={15} /> AI loan advisor <small>{advice.by === 'gemini' ? 'Gemini' : 'offline'}</small>
+              <Sparkles size={15} /> {t.advisor} <small>{advice.by === 'gemini' ? 'Gemini' : 'offline'}</small>
             </div>
             <p>{advice.summary}</p>
             <p className="risk">{advice.risk}</p>
@@ -292,23 +293,23 @@ function Calculator({ offer }: { offer: Offer }) {
           </>
         ) : (
           <button className="advisor-cta" onClick={ask} disabled={advising}>
-            <Sparkles size={16} /> {advising ? 'Gemini is checking your cash flow…' : 'Is this right for my shop? Ask the AI advisor'}
+            <Sparkles size={16} /> {advising ? '…' : t.askAdvisor}
           </button>
         )}
       </div>
 
       <button className="btn primary block" style={{ marginTop: 16 }} onClick={() => setConsent(true)} disabled={!!pending}>
-        <Banknote size={18} /> {pending ? 'Application in progress' : `Apply for ${inr(amount)}`}
+        <Banknote size={18} /> {pending ? t.inProgress : tf(t.apply, { amt: inr(amount) })}
       </button>
 
       {consent && (
         <Sheet
-          title="Share your records"
+          title={t.shareRecords}
           onClose={() => setConsent(false)}
           foot={
             <>
               <button className="btn ghost" onClick={() => setConsent(false)}>
-                Cancel
+                {t.cancel}
               </button>
               <button
                 className="btn primary"
@@ -321,7 +322,7 @@ function Calculator({ offer }: { offer: Offer }) {
                   document.querySelector('.screen')?.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
               >
-                <FileCheck2 size={17} /> Agree and apply
+                <FileCheck2 size={17} /> {t.agreeApply}
               </button>
             </>
           }

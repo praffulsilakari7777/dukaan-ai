@@ -24,12 +24,14 @@ export interface Entry {
 /** An entry the AI proposed that the owner has not confirmed yet. */
 export type Draft = Omit<Entry, 'id' | 'ts'> & { key: string };
 
-export type Lang = 'en' | 'hi';
+export type Lang = 'en' | 'hi' | 'hinglish' | 'bn' | 'te' | 'mr' | 'ta' | 'gu' | 'kn' | 'ml' | 'pa' | 'or';
 
 export interface Settings {
   shopName: string;
   ownerName: string;
   lang: Lang;
+  /** Settings schema version; 2 introduced real Hindi alongside Hinglish. */
+  v?: number;
   voiceLang: string;
   model: string;
 }

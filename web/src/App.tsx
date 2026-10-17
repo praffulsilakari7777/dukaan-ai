@@ -2,6 +2,8 @@ import { BookUser, CheckCircle2, Home as HomeIcon, Landmark, Languages, Lightbul
 import { useEffect, useState } from 'react';
 import { health } from './lib/api';
 import { useStore } from './lib/store';
+import { langInfo } from './lib/i18n';
+import { LanguagePicker } from './components/LanguagePicker';
 import { useWide } from './lib/useWide';
 import { AddSheet } from './screens/Add';
 import { AskSheet } from './screens/Ask';
@@ -15,7 +17,7 @@ import { SettingsSheet } from './screens/Settings';
 import { Stock } from './screens/Stock';
 
 export type Tab = 'home' | 'stock' | 'khata' | 'insights' | 'offers' | 'loans';
-type Overlay = null | 'add' | 'ask' | 'ask-voice' | 'settings';
+type Overlay = null | 'add' | 'ask' | 'ask-voice' | 'settings' | 'lang';
 
 export function Logo({ size = 34 }: { size?: number }) {
   return (
@@ -29,7 +31,7 @@ export function Logo({ size = 34 }: { size?: number }) {
 }
 
 export default function App() {
-  const { t, ledger, settings, toastMsg, updateSettings } = useStore();
+  const { t, ledger, settings, toastMsg } = useStore();
   const wide = useWide();
   const [tab, setTab] = useState<Tab>('home');
   const [overlay, setOverlay] = useState<Overlay>(null);
@@ -61,7 +63,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [overlay]);
 
-  const titles: Record<Tab, string> = { home: t.home, stock: t.stock, khata: t.khata, insights: t.insights, offers: 'Smart offers', loans: 'Loans' };
+  const titles: Record<Tab, string> = { home: t.home, stock: t.stock, khata: t.khata, insights: t.insights, offers: t.offers, loans: t.loans };
   const icons = { home: HomeIcon, stock: Package, khata: BookUser, insights: Lightbulb, offers: Tag, loans: Landmark };
   const badges: Partial<Record<Tab, number>> = { stock: ledger.lowCount, khata: ledger.customers.filter((c) => c.due > 0).length, offers: offerCandidates(ledger).length };
   // On phones, Offers lives under Stock and Loans under Insights.
@@ -96,11 +98,11 @@ export default function App() {
           </div>
         </div>
         <button className="btn add-btn block" onClick={() => setOverlay('add')}>
-          <Plus size={19} strokeWidth={2.6} /> New entry <kbd>N</kbd>
+          <Plus size={19} strokeWidth={2.6} /> {t.newEntry} <kbd>N</kbd>
         </button>
         <nav className="side-nav" aria-label="Main">
           {(['home', 'stock', 'khata', 'insights'] as Tab[]).map(navItem)}
-          <span className="side-group">Grow</span>
+          <span className="side-group">{t.grow}</span>
           {(['offers', 'loans'] as Tab[]).map(navItem)}
         </nav>
         <div className="side-foot">
@@ -124,20 +126,20 @@ export default function App() {
           <header className="topbar">
             <div className="tb-title">
               <h1>{tab === 'home' ? `${greet}, ${settings.ownerName}` : titles[tab]}</h1>
-              <span>{now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+              <span>{now.toLocaleDateString(langInfo(settings.lang).bcp, { weekday: 'long', day: 'numeric', month: 'long' })}</span>
             </div>
             <button className="tb-ask" onClick={() => setOverlay('ask')} style={tab === 'home' ? { visibility: 'hidden' } : undefined}>
               <Sparkles size={18} />
               <span>{t.askPlaceholder}</span>
               <kbd>/</kbd>
             </button>
-            <button className="tb-btn" onClick={() => updateSettings({ lang: settings.lang === 'en' ? 'hi' : 'en' })} aria-label="Switch language">
-              <Languages size={17} /> {settings.lang === 'en' ? 'English' : 'Hinglish'}
+            <button className="tb-btn" onClick={() => setOverlay('lang')} aria-label={t.chooseLanguage}>
+              <Languages size={17} /> {langInfo(settings.lang).native}
             </button>
           </header>
         )}
 
-        {tab === 'home' && <Home go={setTab} openAdd={() => setOverlay('add')} openAsk={(v, q) => { setAskQ(q); setOverlay(v ? 'ask-voice' : 'ask'); }} openSettings={() => setOverlay('settings')} />}
+        {tab === 'home' && <Home go={setTab} openAdd={() => setOverlay('add')} openAsk={(v, q) => { setAskQ(q); setOverlay(v ? 'ask-voice' : 'ask'); }} openSettings={() => setOverlay('settings')} openLang={() => setOverlay('lang')} />}
         {tab === 'stock' && <Stock openAdd={() => setOverlay('add')} go={setTab} />}
         {tab === 'khata' && <Khata />}
         {tab === 'insights' && <Insights go={setTab} />}
@@ -160,6 +162,7 @@ export default function App() {
       {overlay === 'add' && <AddSheet onClose={close} />}
       {(overlay === 'ask' || overlay === 'ask-voice') && <AskSheet onClose={close} startVoice={overlay === 'ask-voice'} initial={askQ} />}
       {overlay === 'settings' && <SettingsSheet onClose={close} />}
+      {overlay === 'lang' && <LanguagePicker onClose={close} />}
 
       {toastMsg && (
         <div className="toast" role="status">

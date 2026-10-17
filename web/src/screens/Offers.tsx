@@ -1,13 +1,15 @@
-import { ArrowLeft, CalendarClock, Download, Loader2, PackageX, RefreshCw, Send, Sparkles, Tag, TimerOff } from 'lucide-react';
+import { ArrowLeft, CalendarClock, Download, ImageIcon, Loader2, PackageX, RefreshCw, Send, Sparkles, Tag, TimerOff, Wand2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Sheet } from '../components/ui';
-import { generateOffer, OfflineError } from '../lib/api';
+import { generateOffer, offerImage, OfflineError } from '../lib/api';
+import { shareImage } from '../lib/share';
 import { fmtQty, inr, uid } from '../lib/ledger';
 import { drawPoster, fastMovers, offerCandidates, offlineOffer, type ActiveOffer, type OfferCandidate, type OfferPlan } from '../lib/offers';
 import { useStore } from '../lib/store';
+import { tf } from '../lib/i18n';
 
 export function Offers({ back }: { back?: () => void }) {
-  const { ledger, offers, endOffer, settings } = useStore();
+  const { ledger, offers, endOffer, settings, t } = useStore();
   const candidates = useMemo(() => offerCandidates(ledger).filter((c) => !offers.some((o) => o.item === c.item && o.expiresTs > Date.now())), [ledger, offers]);
   const [open, setOpen] = useState<OfferCandidate | null>(null);
   const atRisk = candidates.reduce((s, c) => s + c.atRiskValue, 0);
@@ -18,19 +20,19 @@ export function Offers({ back }: { back?: () => void }) {
       <header className="page-head">
         {back && (
           <button className="back only-narrow" onClick={back}>
-            <ArrowLeft size={18} /> Stock
+            <ArrowLeft size={18} /> {t.stock}
           </button>
         )}
-        <h1 className="only-narrow">Smart offers</h1>
+        <h1 className="only-narrow">{t.offers}</h1>
         <div className="lead">
           <span className="big num" style={{ color: atRisk ? 'var(--bad)' : undefined }}>
             {inr(atRisk)}
           </span>
           <span className="cap">
-            of stock at risk · {candidates.length} item{candidates.length === 1 ? '' : 's'} need an offer
+            {t.ofStockAtRisk} · {tf(t.needOffer, { n: candidates.length })}
           </span>
         </div>
-        <p className="page-sub">Dukaan AI watches expiry dates and how fast each item sells. Gemini designs an offer that clears the stock without giving away your margin.</p>
+        <p className="page-sub">{t.offersSub}</p>
       </header>
 
       <div className="section" style={{ marginTop: 0 }}>
@@ -39,8 +41,8 @@ export function Offers({ back }: { back?: () => void }) {
             <div className="ic">
               <Tag size={26} />
             </div>
-            <b>Nothing at risk</b>
-            Every item is selling before it expires.
+            <b>{t.nothingAtRisk}</b>
+            {t.nothingAtRiskSub}
           </div>
         ) : (
           <div className="cand-grid">
@@ -50,28 +52,28 @@ export function Offers({ back }: { back?: () => void }) {
                   <span className={`cand-ic ${c.reason}`}>{c.reason === 'expiring' ? <CalendarClock size={19} /> : <PackageX size={19} />}</span>
                   <div className="cand-main">
                     <b>{c.item}</b>
-                    <span className={`pill ${c.reason === 'expiring' ? ((c.daysToExpiry ?? 9) <= 2 ? 'bad' : 'warn') : 'neutral'}`}>{c.reason === 'expiring' ? 'Expiring' : 'Not selling'}</span>
+                    <span className={`pill ${c.reason === 'expiring' ? ((c.daysToExpiry ?? 9) <= 2 ? 'bad' : 'warn') : 'neutral'}`}>{c.reason === 'expiring' ? t.expiringTag : t.notSelling}</span>
                   </div>
                 </div>
                 <p className="cand-why">{c.why}</p>
                 <dl className="cand-stats num">
                   <div>
-                    <dt>At risk</dt>
+                    <dt>{t.atRisk}</dt>
                     <dd>{inr(c.atRiskValue)}</dd>
                   </div>
                   <div>
-                    <dt>Cost / sells at</dt>
+                    <dt>{t.costSells}</dt>
                     <dd>
                       {inr(c.cost)} / {inr(c.price)}
                     </dd>
                   </div>
                   <div>
-                    <dt>Margin</dt>
+                    <dt>{t.margin}</dt>
                     <dd>{c.maxDiscount}%</dd>
                   </div>
                 </dl>
                 <button className="btn primary block" onClick={() => setOpen(c)}>
-                  <Sparkles size={17} /> Create offer with AI
+                  <Sparkles size={17} /> {t.createOffer}
                 </button>
               </article>
             ))}
@@ -82,7 +84,7 @@ export function Offers({ back }: { back?: () => void }) {
       {live.length > 0 && (
         <section className="section">
           <div className="section-head">
-            <h2>Live offers</h2>
+            <h2>{t.liveOffers}</h2>
             <span className="aside-txt">{live.length} running</span>
           </div>
           <div className="card">
@@ -99,7 +101,7 @@ export function Offers({ back }: { back?: () => void }) {
                     </div>
                   </div>
                   <a className="btn ghost sm" href={`https://wa.me/?text=${encodeURIComponent(o.whatsapp_message)}`} target="_blank" rel="noreferrer">
-                    <Send size={14} /> Share
+                    <Send size={14} /> {t.share}
                   </a>
                   <button className="btn ghost sm" onClick={() => endOffer(o.id)} aria-label={`End ${o.headline}`}>
                     <TimerOff size={14} />
@@ -116,10 +118,14 @@ export function Offers({ back }: { back?: () => void }) {
 }
 
 function OfferComposer({ c, shop, onClose }: { c: OfferCandidate; shop: string; onClose: () => void }) {
-  const { ledger, settings, addOffer, toast } = useStore();
+  const { ledger, settings, addOffer, toast, t } = useStore();
   const [plan, setPlan] = useState<(OfferPlan & { by: 'gemini' | 'offline' }) | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
+  const [aiImg, setAiImg] = useState<string | null>(null);
+  const [imgBusy, setImgBusy] = useState(false);
+  const [imgErr, setImgErr] = useState<string | null>(null);
+  const [view, setView] = useState<'design' | 'ai'>('design');
   const pairs = fastMovers(ledger, c.item);
 
   async function make() {
@@ -133,7 +139,25 @@ function OfferComposer({ c, shop, onClose }: { c: OfferCandidate; shop: string; 
     }
     setPlan(p);
     setMsg(p.whatsapp_message);
+    setAiImg(null);
+    setView('design');
     setBusy(false);
+  }
+
+  async function paint() {
+    if (!plan) return;
+    setImgBusy(true);
+    setImgErr(null);
+    setView('ai');
+    try {
+      const r = await offerImage({ offer: { ...plan, item: c.item, unit: c.unit }, shop, lang: settings.lang });
+      setAiImg(`data:${r.mime};base64,${r.data}`);
+    } catch (e) {
+      if (!(e instanceof OfflineError)) console.error(e);
+      setImgErr(t.imageNeedsGemini);
+      setView('design');
+    }
+    setImgBusy(false);
   }
 
   const started = useRef(false);
@@ -145,6 +169,8 @@ function OfferComposer({ c, shop, onClose }: { c: OfferCandidate; shop: string; 
   }, []);
 
   const poster = useMemo(() => (plan ? drawPoster({ ...plan, item: c.item, unit: c.unit }, shop) : null), [plan, c.item, c.unit, shop]);
+  const shown = view === 'ai' && aiImg ? aiImg : poster;
+  const slug = c.item.toLowerCase().replace(/\s+/g, '-');
 
   return (
     <Sheet
@@ -157,9 +183,9 @@ function OfferComposer({ c, shop, onClose }: { c: OfferCandidate; shop: string; 
             <button className="btn ghost" onClick={make} disabled={busy} aria-label="Generate another offer">
               <RefreshCw size={16} className={busy ? 'spin' : ''} />
             </button>
-            <a className="btn wa" href={`https://wa.me/?text=${encodeURIComponent(msg)}`} target="_blank" rel="noreferrer">
-              <Send size={16} /> WhatsApp
-            </a>
+            <button className="btn wa" onClick={() => shown && shareImage(shown, msg, `${slug}-offer.png`)} disabled={!shown}>
+              <Send size={16} /> {t.shareWa}
+            </button>
             <button
               className="btn primary"
               style={{ flex: 1 }}
@@ -170,7 +196,7 @@ function OfferComposer({ c, shop, onClose }: { c: OfferCandidate; shop: string; 
                 onClose();
               }}
             >
-              <Tag size={16} /> Start offer
+              <Tag size={16} /> {t.startOffer}
             </button>
           </>
         ) : undefined
@@ -179,7 +205,7 @@ function OfferComposer({ c, shop, onClose }: { c: OfferCandidate; shop: string; 
       {!plan ? (
         <div className="composer-loading">
           <Loader2 size={28} className="spin" />
-          <b>Gemini is designing an offer…</b>
+          <b>{t.designing}</b>
           <span>
             Checking {fmtQty(c.atRiskQty, c.unit)} at risk, your {c.maxDiscount}% margin and what sells fastest
           </span>
@@ -187,12 +213,37 @@ function OfferComposer({ c, shop, onClose }: { c: OfferCandidate; shop: string; 
       ) : (
         <div className="composer-grid" style={{ opacity: busy ? 0.5 : 1 }}>
           <div className="poster-wrap">
-            {poster && <img src={poster} alt={`Poster: ${plan.headline}`} />}
-            {poster && (
-              <a className="btn ghost sm" href={poster} download={`${c.item.toLowerCase().replace(/\s+/g, '-')}-offer.png`}>
-                <Download size={14} /> Download poster
-              </a>
-            )}
+            <div className="seg poster-seg">
+              <button className={view === 'design' ? 'on' : ''} onClick={() => setView('design')}>
+                <ImageIcon size={14} /> {t.posterDesign}
+              </button>
+              <button className={view === 'ai' ? 'on' : ''} onClick={() => (aiImg ? setView('ai') : paint())} disabled={imgBusy}>
+                <Wand2 size={14} /> {t.posterAi}
+              </button>
+            </div>
+            <div className="poster-frame">
+              {view === 'ai' && imgBusy ? (
+                <div className="poster-loading">
+                  <Loader2 size={26} className="spin" />
+                  <span>{t.genImageLoading}</span>
+                </div>
+              ) : (
+                shown && <img src={shown} alt={`Poster: ${plan.headline}`} />
+              )}
+            </div>
+            {imgErr && <p className="poster-err">{imgErr}</p>}
+            <div className="poster-actions">
+              {!aiImg && !imgBusy && (
+                <button className="btn ghost sm" onClick={paint}>
+                  <Wand2 size={14} /> {t.genImage}
+                </button>
+              )}
+              {shown && (
+                <a className="btn ghost sm" href={shown} download={`${slug}-offer.png`}>
+                  <Download size={14} /> {t.downloadPoster}
+                </a>
+              )}
+            </div>
           </div>
           <div className="plan">
             <span className="pill brand">{plan.offer_type === 'discount' ? 'Discount' : plan.offer_type === 'bogo' ? 'Buy one, get one' : plan.offer_type === 'bundle' ? 'Bundle' : 'Combo'}</span>
@@ -207,7 +258,7 @@ function OfferComposer({ c, shop, onClose }: { c: OfferCandidate; shop: string; 
               <p>{plan.reasoning}</p>
             </div>
             <label className="field" style={{ marginTop: 14 }}>
-              <span>WhatsApp message to customers</span>
+              <span>{t.waMsg}</span>
               <textarea className="input area" rows={4} value={msg} onChange={(e) => setMsg(e.target.value)} />
             </label>
             <div className="by" style={{ fontSize: 11.5, color: 'var(--ink-3)', display: 'flex', gap: 5, alignItems: 'center' }}>
