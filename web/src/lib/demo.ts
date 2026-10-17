@@ -17,12 +17,15 @@ export function demoEntries(now = Date.now()): { entries: Entry[]; phones: Recor
     ['Biscuits', 250, 'pkt', 2500], ['Soap', 80, 'pc', 2400], ['Detergent', 25, 'kg', 2250], ['Eggs', 30, 'dozen', 1650],
     ['Ghee', 8, 'L', 4400],
   ];
-  for (const [item, qty, unit, amount] of opening) add({ type: 'purchase', ts: at(21, 9), item, qty, unit, amount, supplier: 'Agarwal Traders' });
+  // Shelf life in days for items that go off; staples are left without a date.
+  const LIFE: Record<string, number> = { Biscuits: 120, Maggi: 240, Eggs: 18, Milk: 2, Bread: 4, Tea: 365, 'Mustard Oil': 270, Ghee: 270, Atta: 60 };
+  const exp = (ts: number, item: string) => (LIFE[item] ? ts + LIFE[item] * DAY : undefined);
+  for (const [item, qty, unit, amount] of opening) add({ type: 'purchase', ts: at(21, 9), item, qty, unit, amount, supplier: 'Agarwal Traders', expiry: exp(at(21, 9), item) });
   // A restock in the middle, so weighted average cost moves.
   const restock: [string, number, string, number][] = [
     ['Rice', 100, 'kg', 4600], ['Atta', 80, 'kg', 2720], ['Toor Dal', 20, 'kg', 2440], ['Mustard Oil', 24, 'L', 3360], ['Maggi', 100, 'pkt', 1200], ['Eggs', 30, 'dozen', 1680],
   ];
-  for (const [item, qty, unit, amount] of restock) add({ type: 'purchase', ts: at(10, 9, 30), item, qty, unit, amount, supplier: 'Agarwal Traders' });
+  for (const [item, qty, unit, amount] of restock) add({ type: 'purchase', ts: at(10, 9, 30), item, qty, unit, amount, supplier: 'Agarwal Traders', expiry: exp(at(10, 9, 30), item) });
 
   // Daily selling pattern: [item, unit, qty range, price per unit].
   const sells: [string, string, [number, number], number][] = [
@@ -46,11 +49,23 @@ export function demoEntries(now = Date.now()): { entries: Entry[]; phones: Recor
       if (d === 0 && hour >= new Date(now).getHours() && new Date(now).getHours() > 8) continue;
       add({ type: 'sale', ts: at(d, hour, pick(0, 59)), item, qty: q, unit, amount: q * price });
     }
-    add({ type: 'purchase', ts: at(d, 6, 30), item: 'Milk', qty: 30, unit: 'L', amount: 1500, supplier: 'Dairy' });
-    add({ type: 'purchase', ts: at(d, 6, 40), item: 'Bread', qty: 14, unit: 'pkt', amount: 532, supplier: 'Bakery' });
+    add({ type: 'purchase', ts: at(d, 6, 30), item: 'Milk', qty: 30, unit: 'L', amount: 1500, supplier: 'Dairy', expiry: exp(at(d, 6, 30), 'Milk') });
+    add({ type: 'purchase', ts: at(d, 6, 40), item: 'Bread', qty: 14, unit: 'pkt', amount: 532, supplier: 'Bakery', expiry: exp(at(d, 6, 40), 'Bread') });
     if (d % 7 === 3) add({ type: 'expense', ts: at(d, 19), amount: 450, note: 'Transport' });
   }
   add({ type: 'expense', ts: at(15, 11), amount: 1800, note: 'Electricity bill' });
+
+  // Stock that needs an offer: two items about to expire, two that stopped selling.
+  add({ type: 'purchase', ts: at(3, 9), item: 'Paneer', qty: 6, unit: 'kg', amount: 1800, supplier: 'Dairy', expiry: at(-2, 21) });
+  add({ type: 'sale', ts: at(2, 18), item: 'Paneer', qty: 1, unit: 'kg', amount: 400 });
+  add({ type: 'sale', ts: at(1, 19), item: 'Paneer', qty: 0.5, unit: 'kg', amount: 200 });
+  add({ type: 'purchase', ts: at(2, 7), item: 'Curd', qty: 16, unit: 'pkt', amount: 400, supplier: 'Dairy', expiry: at(-1, 21) });
+  add({ type: 'sale', ts: at(2, 17), item: 'Curd', qty: 4, unit: 'pkt', amount: 140 });
+  add({ type: 'sale', ts: at(1, 17), item: 'Curd', qty: 3, unit: 'pkt', amount: 105 });
+  add({ type: 'purchase', ts: at(30, 10), item: 'Cold Drink', qty: 48, unit: 'bottle', amount: 1536, supplier: 'Agarwal Traders', expiry: at(-150, 10) });
+  for (const d of [29, 27, 26, 24, 22, 19]) add({ type: 'sale', ts: at(d, 16), item: 'Cold Drink', qty: 2, unit: 'bottle', amount: 90 });
+  add({ type: 'purchase', ts: at(45, 10), item: 'Namkeen', qty: 40, unit: 'pkt', amount: 720, supplier: 'Agarwal Traders', expiry: at(-5, 10) });
+  for (let d = 44; d > 0; d -= 3) add({ type: 'sale', ts: at(d, 15), item: 'Namkeen', qty: 1, unit: 'pkt', amount: 25 });
 
   // Udhaar customers: one good payer, one slipping, one long overdue.
   const credit = (daysAgo: number, customer: string, item: string, qty: number, unit: string, amount: number) =>

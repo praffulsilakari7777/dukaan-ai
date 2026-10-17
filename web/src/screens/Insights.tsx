@@ -5,6 +5,7 @@ import { TOOLS, type WaDraft } from '../lib/agent';
 import { insights, OfflineError, type InsightResult } from '../lib/api';
 import { fmtQty, inr, type Ledger } from '../lib/ledger';
 import { useStore } from '../lib/store';
+import type { Tab } from '../App';
 
 function insightSummary(ledger: Ledger, shop: string) {
   const items = [...ledger.stock].filter((s) => s.sold7 > 0).sort((a, b) => b.profit7 - a.profit7);
@@ -42,7 +43,7 @@ function offlineInsights(s: ReturnType<typeof insightSummary>): InsightResult {
 
 const CACHE = 'dukaan-ai:insights';
 
-export function Insights() {
+export function Insights({ go }: { go: (t: Tab) => void }) {
   const { ledger, t, settings } = useStore();
   const { score } = ledger;
   const [ai, setAi] = useState<(InsightResult & { by: 'gemini' | 'offline'; sig: string }) | null>(() => {
@@ -119,6 +120,9 @@ export function Insights() {
               </div>
               <div className="k">{score.loan ? t.loanReady : t.notYet}</div>
               <div className="v num">{score.loan ? `up to ${inr(score.loan)}` : '—'}</div>
+              <button className="btn primary sm" style={{ marginTop: 12 }} onClick={() => go('loans')}>
+                See loan offers
+              </button>
             </div>
           </div>
           <div className="parts">
@@ -213,7 +217,7 @@ export function Insights() {
                       {fmtQty(s.qty, s.unit)} on shelf · {inr(s.value)} stuck
                     </div>
                   </div>
-                  <button className="btn ghost sm" onClick={() => setDraft(TOOLS.draft_promo({ item: s.name }, ctx).drafts![0])}>
+                  <button className="btn ghost sm" onClick={() => go('offers')}>
                     <Tag size={14} /> {t.makePromo}
                   </button>
                 </li>

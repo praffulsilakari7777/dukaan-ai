@@ -1,7 +1,9 @@
-import { ArrowUp, Check, Clock, MessageCircle, Mic, PackageSearch, Sparkles, TrendingUp, Wand2 } from 'lucide-react';
+import { ArrowUp, Check, Clock, Landmark, MessageCircle, Mic, PackageSearch, Send, Sparkles, Tag, TrendingUp, Wand2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { DraftCards, Sheet, WaCard } from '../components/ui';
-import { askDukaan, type AgentReply, type AgentStep } from '../lib/agent';
+import { askDukaan, type AgentReply, type AgentStep, type OfferDraft } from '../lib/agent';
+import { inr, uid } from '../lib/ledger';
+import { drawPoster } from '../lib/offers';
 import type { GeminiContent } from '../lib/api';
 import { useVoice } from '../lib/speech';
 import { useStore } from '../lib/store';
@@ -12,7 +14,8 @@ const SUGGESTIONS = [
   { icon: TrendingUp, q: 'Which item made the most profit this week?' },
   { icon: MessageCircle, q: 'Send reminders to everyone who owes me money' },
   { icon: PackageSearch, q: 'Make a sugar and dal order for my supplier' },
-  { icon: Wand2, q: 'Write a WhatsApp offer for my slowest item' },
+  { icon: Wand2, q: "What's expiring or not selling? Make an offer" },
+  { icon: Landmark, q: 'How much loan can I get, and can I afford it?' },
 ];
 
 interface Turn {
@@ -25,11 +28,16 @@ interface Turn {
   error?: string;
 }
 
+const LONG = new Set(['message', 'whatsapp_message', 'reasoning', 'poster_tagline', 'headline']);
 const fmtArgs = (a: Record<string, unknown>) =>
   Object.entries(a)
-    .filter(([k]) => k !== 'message')
-    .map(([k, v]) => `${k}: ${typeof v === 'object' ? (Array.isArray(v) ? `[${v.length}]` : '{…}') : JSON.stringify(v)}`)
-    .join(', ');
+    .filter(([k]) => !LONG.has(k))
+    .slice(0, 3)
+    .map(([k, v]) => {
+      const val = typeof v === 'object' ? (Array.isArray(v) ? `[${v.length}]` : '{…}') : JSON.stringify(v);
+      return `${k}: ${val.length > 24 ? val.slice(0, 22) + '…"' : val}`;
+    })
+    .join(', ') + (Object.keys(a).filter((k) => !LONG.has(k)).length > 3 ? ', …' : '');
 
 export function AskSheet({ onClose, startVoice, initial }: { onClose: () => void; startVoice?: boolean; initial?: string }) {
   const store = useStore();
@@ -166,6 +174,9 @@ export function AskSheet({ onClose, startVoice, initial }: { onClose: () => void
                   {turn.reply.drafts.map((d, i) => (
                     <WaCard key={i} d={d} />
                   ))}
+                  {turn.reply.offers.map((o, i) => (
+                    <OfferCard key={i} o={o} />
+                  ))}
                   {turn.pending.length > 0 && !turn.saved && (
                     <div className="card card-pad" style={{ display: 'grid', gap: 10 }}>
                       <DraftCards drafts={turn.pending} onChange={(p) => setTurns((ts) => ts.map((x) => (x.id === turn.id ? { ...x, pending: p } : x)))} />
@@ -193,5 +204,41 @@ export function AskSheet({ onClose, startVoice, initial }: { onClose: () => void
         <div ref={end} />
       </div>
     </Sheet>
+  );
+}
+
+function OfferCard({ o }: { o: OfferDraft }) {
+  const { settings, addOffer, offers, toast } = useStore();
+  const poster = drawPoster(o, settings.shopName);
+  const live = offers.some((x) => x.item === o.item && x.headline === o.headline);
+  return (
+    <article className="offer-card">
+      <img src={poster} alt={`Poster: ${o.headline}`} />
+      <div className="oc-body">
+        <span className="pill brand">
+          <Tag size={11} /> Offer draft
+        </span>
+        <b>{o.headline}</b>
+        <span className="num oc-price">
+          {inr(o.offer_price)}/{o.unit} · {o.valid_days <= 1 ? 'today only' : `${o.valid_days} days`}
+        </span>
+        {o.reasoning && <p>{o.reasoning}</p>}
+        <div className="oc-act">
+          <a className="btn wa sm" href={`https://wa.me/?text=${encodeURIComponent(o.whatsapp_message)}`} target="_blank" rel="noreferrer">
+            <Send size={14} /> WhatsApp
+          </a>
+          <button
+            className="btn primary sm"
+            disabled={live}
+            onClick={() => {
+              addOffer({ ...o, id: uid(), createdTs: Date.now(), expiresTs: Date.now() + Math.max(o.valid_days, 1) * 86_400_000, by: 'gemini' });
+              toast(`Offer live · ${o.headline}`);
+            }}
+          >
+            {live ? 'Live' : 'Start offer'}
+          </button>
+        </div>
+      </div>
+    </article>
   );
 }

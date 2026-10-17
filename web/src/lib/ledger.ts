@@ -72,12 +72,14 @@ export function buildLedger(entries: Entry[], phones: Record<string, string>, no
   const today = { sales: 0, profit: 0, expenses: 0, purchases: 0, received: 0, count: 0 };
   const soldWindow = new Map<string, number>();
   const restocks = new Map<string, number>();
+  // Stock is sold oldest batch first, so we know what is left and when it expires.
+  const batches = new Map<string, { qty: number; ts: number; expiry?: number }[]>();
 
   const item = (name: string, unit?: string) => {
     const key = keyOf(name);
     let it = items.get(key);
     if (!it) {
-      it = { key, name, unit: unit ?? 'pc', qty: 0, avgCost: 0, lastPrice: 0, velocity: 0, daysLeft: Infinity, low: false, daily: false, value: 0, profit7: 0, sold7: 0, lastSoldTs: 0 };
+      it = { key, name, unit: unit ?? 'pc', qty: 0, avgCost: 0, lastPrice: 0, velocity: 0, daysLeft: Infinity, low: false, daily: false, value: 0, profit7: 0, sold7: 0, lastSoldTs: 0, expiringQty: 0, oldestBatchTs: 0 };
       items.set(key, it);
     }
     if (unit && it.unit === 'pc' && unit !== 'pc') it.unit = unit;
@@ -104,6 +106,9 @@ export function buildLedger(entries: Entry[], phones: Record<string, string>, no
         const newQty = base + e.qty;
         it.avgCost = newQty > 0 ? (base * it.avgCost + e.amount) / newQty : it.avgCost;
         it.qty = it.qty + e.qty;
+        const b = batches.get(it.key) ?? [];
+        b.push({ qty: e.qty, ts: e.ts, expiry: e.expiry });
+        batches.set(it.key, b);
         if (now - e.ts <= 14 * DAY) restocks.set(it.key, (restocks.get(it.key) ?? 0) + 1);
       }
     } else if (e.type === 'sale') {
@@ -113,6 +118,13 @@ export function buildLedger(entries: Entry[], phones: Record<string, string>, no
         const q = e.qty ?? 1;
         if (it.avgCost > 0) cost = q * it.avgCost;
         it.qty -= q;
+        let left = q;
+        for (const b of batches.get(it.key) ?? []) {
+          if (left <= 0) break;
+          const take = Math.min(b.qty, left);
+          b.qty -= take;
+          left -= take;
+        }
         it.lastPrice = e.amount / q;
         it.lastSoldTs = e.ts;
         if (now - e.ts <= 14 * DAY) soldWindow.set(it.key, (soldWindow.get(it.key) ?? 0) + q);
@@ -156,6 +168,11 @@ export function buildLedger(entries: Entry[], phones: Record<string, string>, no
   today.profit -= today.expenses;
 
   for (const it of items.values()) {
+    const onShelf = (batches.get(it.key) ?? []).filter((b) => b.qty > 0.0001);
+    it.oldestBatchTs = onShelf[0]?.ts ?? 0;
+    const exp = onShelf.filter((b) => b.expiry).sort((a, b) => a.expiry! - b.expiry!);
+    it.nextExpiry = exp[0]?.expiry;
+    it.expiringQty = exp.filter((b) => b.expiry! - now <= 7 * DAY).reduce((s, b) => s + b.qty, 0);
     it.velocity = (soldWindow.get(it.key) ?? 0) / 14;
     it.daysLeft = it.velocity > 0 ? Math.max(it.qty, 0) / it.velocity : Infinity;
     // Milk and bread arrive every morning; only flag them when the shelf is actually bare.

@@ -1,6 +1,8 @@
 import { agentTurn, OfflineError, toDrafts, type GeminiContent, type GeminiPart } from './api';
 import { daysSince, fmtQty, inr, keyOf, startOfDay, type Ledger } from './ledger';
 import { offlineParse } from './parser';
+import { avgDailyProfit, loanOffers, offlineAdvice } from './lending';
+import { fastMovers, offerCandidates, offlineOffer, type OfferPlan } from './offers';
 import type { Draft, Entry, Settings } from './types';
 
 const DAY = 86_400_000;
@@ -18,11 +20,17 @@ export interface WaDraft {
   text: string;
 }
 
+export interface OfferDraft extends OfferPlan {
+  item: string;
+  unit: string;
+}
+
 export interface AgentReply {
   answer: string;
   steps: AgentStep[];
   drafts: WaDraft[];
   proposed: Draft[];
+  offers: OfferDraft[];
   by: 'gemini' | 'offline';
 }
 
@@ -33,7 +41,7 @@ interface Ctx {
   phones: Record<string, string>;
 }
 
-type ToolOut = { result: unknown; summary: string; drafts?: WaDraft[]; proposed?: Draft[] };
+type ToolOut = { result: unknown; summary: string; drafts?: WaDraft[]; proposed?: Draft[]; offers?: OfferDraft[] };
 
 const PERIODS: Record<string, number> = { today: 0, yesterday: 1, week: 6, month: 29 };
 
@@ -123,6 +131,42 @@ export const TOOLS: Record<string, (args: any, ctx: Ctx) => ToolOut> = {
     return { result: { drafted: true, item }, summary: `offer for ${item}`, drafts: [{ kind: 'promo', to: 'Customers', text }] };
   },
 
+  find_offer_candidates(_: unknown, { ledger }) {
+    const c = offerCandidates(ledger);
+    return {
+      result: { items: c.map(({ urgency: _u, key: _k, ...r }) => r), fast_sellers: fastMovers(ledger, '') },
+      summary: c.length ? `${c.length} at risk, ${inr(c.reduce((s, x) => s + x.atRiskValue, 0))}` : 'nothing at risk',
+    };
+  },
+
+  create_offer(args: Partial<OfferPlan> & { item: string }, { ledger, settings }) {
+    const cand = offerCandidates(ledger).find((c) => keyOf(c.item) === keyOf(args.item));
+    const stock = ledger.stock.find((s) => keyOf(s.name) === keyOf(args.item));
+    const base = cand ? offlineOffer(cand, settings.shopName, fastMovers(ledger, cand.item)) : null;
+    const plan: OfferDraft = {
+      ...(base ?? { headline: `Offer on ${args.item}`, offer_type: 'discount', discount_pct: 10, bundle_with: null, offer_price: Math.round((stock?.lastPrice ?? 0) * 0.9), valid_days: 3, whatsapp_message: '', poster_tagline: 'Special price this week.', reasoning: '' }),
+      ...Object.fromEntries(Object.entries(args).filter(([, v]) => v != null && v !== '')),
+      item: stock?.name ?? args.item,
+      unit: stock?.unit ?? cand?.unit ?? 'pc',
+    } as OfferDraft;
+    return { result: { shown_to_owner: true, headline: plan.headline }, summary: plan.headline, offers: [plan] };
+  },
+
+  check_loan_eligibility({ amount }: { amount?: number }, { ledger }) {
+    const offers = loanOffers(ledger);
+    const advice = offlineAdvice(ledger, amount ?? Math.max(...offers.map((o) => o.limit)), 'Festival stock');
+    return {
+      result: {
+        dukaan_score: ledger.score.value,
+        avg_daily_profit: Math.round(avgDailyProfit(ledger)),
+        udhaar_outstanding: ledger.totalDue,
+        offers: offers.map((o) => ({ lender: o.p.lender, product: o.p.product, eligible: o.eligible, limit: o.limit, interest_pct: o.rate, tenure_months: o.p.tenures, min_score: o.p.minScore })),
+        affordable_suggestion: { amount: advice.amount, months: advice.months, lender: offers.find((o) => o.p.id === advice.productId)?.p.lender },
+      },
+      summary: `score ${ledger.score.value}, ${offers.filter((o) => o.eligible).length} of ${offers.length} offers open`,
+    };
+  },
+
   record_entry({ entries = [] }: { entries?: any[] }) {
     const proposed = toDrafts(entries);
     return {
@@ -140,6 +184,7 @@ function run(name: string, args: Record<string, unknown>, ctx: Ctx, acc: AgentRe
   acc.steps.push({ tool: name, args, summary: out.summary });
   if (out.drafts) acc.drafts.push(...out.drafts);
   if (out.proposed) acc.proposed.push(...out.proposed);
+  if (out.offers) acc.offers.push(...out.offers);
   return out.result;
 }
 
@@ -150,7 +195,7 @@ export async function askDukaan(
   ctx: Ctx,
   onStep: (s: AgentStep) => void,
 ): Promise<{ reply: AgentReply; history: GeminiContent[] }> {
-  const acc: AgentReply = { answer: '', steps: [], drafts: [], proposed: [], by: 'gemini' };
+  const acc: AgentReply = { answer: '', steps: [], drafts: [], proposed: [], offers: [], by: 'gemini' };
   const contents: GeminiContent[] = [...history, { role: 'user', parts: [{ text: question }] }];
   const meta = {
     shopName: ctx.settings.shopName,
@@ -188,7 +233,7 @@ export async function askDukaan(
 
 /** Keyword agent for when Gemini can't be reached. Same tools, templated answers. */
 function offlineAgent(q: string, ctx: Ctx, onStep: (s: AgentStep) => void): AgentReply {
-  const acc: AgentReply = { answer: '', steps: [], drafts: [], proposed: [], by: 'offline' };
+  const acc: AgentReply = { answer: '', steps: [], drafts: [], proposed: [], offers: [], by: 'offline' };
   const s = q.toLowerCase();
   const say: string[] = [];
   const call = (name: string, args: Record<string, unknown>) => {
@@ -227,12 +272,21 @@ function offlineAgent(q: string, ctx: Ctx, onStep: (s: AgentStep) => void): Agen
         : 'Stock looks healthy. Nothing is about to run out.',
     );
   }
-  if (/(offer|promo|discount|slow)/.test(s)) {
-    const slow = [...ctx.ledger.stock].filter((x) => x.qty > 0).sort((a, b) => a.velocity - b.velocity)[0];
-    if (slow) {
-      call('draft_promo', { item: slow.name });
-      say.push(`${slow.name} is moving slowest, so I wrote an offer for it.`);
-    }
+  if (/(offer|promo|discount|slow|expir|not selling|nahi bik|kharab)/.test(s)) {
+    const r = call('find_offer_candidates', {});
+    const top = r.items[0];
+    if (top) {
+      const plan = offlineOffer(top, ctx.settings.shopName, r.fast_sellers.filter((x: string) => x !== top.item));
+      call('create_offer', { item: top.item, ...plan });
+      say.push(`${r.items.length} item${r.items.length > 1 ? 's are' : ' is'} at risk, worth ${inr(r.items.reduce((a: number, x: any) => a + x.atRiskValue, 0))}. ${top.item} is the most urgent (${top.why.toLowerCase()}), so I made an offer for it: ${plan.headline}.`);
+    } else say.push('Nothing is at risk. Everything is selling before it expires.');
+  }
+  if (/(loan|credit|borrow|karz|karza|lend|finance)/.test(s)) {
+    const want = Number(s.match(/(\d[\d,]{3,})/)?.[1]?.replace(/,/g, '')) || undefined;
+    const r = call('check_loan_eligibility', want ? { amount: want } : {});
+    const open = r.offers.filter((o: any) => o.eligible);
+    const sug = r.affordable_suggestion;
+    say.push(open.length ? `With a Dukaan Score of ${r.dukaan_score}, you qualify for ${open.length} offer${open.length > 1 ? 's' : ''}, up to ${inr(Math.max(...open.map((o: any) => o.limit)))}. Comfortable for your profit: ${inr(sug.amount)} over ${sug.months} months from ${sug.lender}. Open Loans to apply.` : `Your Dukaan Score is ${r.dukaan_score}. A few more weeks of steady records will unlock loan offers.`);
   }
   if (/(profit|munafa|sales|bikri|top|best|most|kamai|earn)/.test(s)) {
     const r = call('get_sales', { period });

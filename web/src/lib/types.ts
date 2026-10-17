@@ -15,6 +15,8 @@ export interface Entry {
   credit?: boolean;
   /** Supplier for purchases. */
   supplier?: string;
+  /** Best-before date of a purchased batch, when known. */
+  expiry?: number;
   note?: string;
   source?: EntrySource;
 }
@@ -49,6 +51,12 @@ export interface StockItem {
   profit7: number;
   sold7: number;
   lastSoldTs: number;
+  /** Earliest best-before date among batches still on the shelf. */
+  nextExpiry?: number;
+  /** Units on the shelf that expire within 7 days. */
+  expiringQty: number;
+  /** Purchase date of the oldest batch still on the shelf. */
+  oldestBatchTs: number;
 }
 
 export interface CustomerTxn {

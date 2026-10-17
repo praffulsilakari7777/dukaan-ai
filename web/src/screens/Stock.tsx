@@ -1,13 +1,17 @@
-import { Package, Search } from 'lucide-react';
+import { ChevronRight, Package, Search, Tag } from 'lucide-react';
+import type { Tab } from '../App';
+import { offerCandidates } from '../lib/offers';
 import { useState } from 'react';
 import { fmtQty, inr } from '../lib/ledger';
 import { useStore } from '../lib/store';
 import { useWide } from '../lib/useWide';
 
-export function Stock({ openAdd }: { openAdd: () => void }) {
+export function Stock({ openAdd, go }: { openAdd: () => void; go: (t: Tab) => void }) {
   const { ledger, t } = useStore();
   const wide = useWide();
   const [q, setQ] = useState('');
+  const risk = offerCandidates(ledger);
+  const riskValue = risk.reduce((s, c) => s + c.atRiskValue, 0);
   const list = ledger.stock.filter((s) => s.name.toLowerCase().includes(q.trim().toLowerCase()));
 
   return (
@@ -29,6 +33,27 @@ export function Stock({ openAdd }: { openAdd: () => void }) {
           </span>
         </div>
       </header>
+
+      {risk.length > 0 && (
+        <div className="constrain">
+          <button className="risk-banner" onClick={() => go('offers')}>
+            <span className="risk-ic">
+              <Tag size={18} />
+            </span>
+            <span className="risk-txt">
+              <b className="num">{inr(riskValue)} of stock at risk</b>
+              <span>
+                {risk
+                  .slice(0, 3)
+                  .map((c) => c.item)
+                  .join(', ')}
+                {risk.length > 3 ? ` +${risk.length - 3}` : ''} · expiring or not selling. Let AI create offers.
+              </span>
+            </span>
+            <ChevronRight size={18} />
+          </button>
+        </div>
+      )}
 
       {ledger.stock.length > 6 && (
         <div className="constrain">

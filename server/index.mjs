@@ -80,6 +80,36 @@ const TOOL_DECLS = [
     parameters: { type: 'OBJECT', properties: { item: { type: 'STRING' }, message: { type: 'STRING' } }, required: ['item', 'message'] },
   },
   {
+    name: 'find_offer_candidates',
+    description: 'Stock at risk: items that will expire before they sell at the current pace, and items that have stopped selling. Returns quantity and value at risk, cost, price and the deepest discount that still covers cost.',
+    parameters: { type: 'OBJECT', properties: {} },
+  },
+  {
+    name: 'create_offer',
+    description: 'Shows the owner a ready offer for one at-risk item: a poster and a WhatsApp message. Call find_offer_candidates first. Keep the price at or above cost unless the stock expires within 2 days. Prefer a combo with a fast seller for slow, non-perishable stock.',
+    parameters: {
+      type: 'OBJECT',
+      properties: {
+        item: { type: 'STRING' },
+        offer_type: { type: 'STRING', enum: ['discount', 'bundle', 'bogo', 'combo'] },
+        discount_pct: { type: 'NUMBER' },
+        bundle_with: { type: 'STRING' },
+        offer_price: { type: 'NUMBER', description: 'Price per unit after the offer, in rupees' },
+        valid_days: { type: 'INTEGER' },
+        headline: { type: 'STRING', description: 'Max 6 words, e.g. "25% off fresh Paneer"' },
+        whatsapp_message: { type: 'STRING', description: 'Short Hinglish message to customers with one emoji and the shop name' },
+        poster_tagline: { type: 'STRING', description: 'Max 7 words' },
+        reasoning: { type: 'STRING', description: 'One sentence for the owner: why this offer, in rupees' },
+      },
+      required: ['item', 'offer_type', 'discount_pct', 'offer_price', 'valid_days', 'headline', 'whatsapp_message', 'poster_tagline', 'reasoning'],
+    },
+  },
+  {
+    name: 'check_loan_eligibility',
+    description: 'The shop\'s Dukaan Score, average daily profit, and the loan offers it qualifies for from partner lenders, with limits and interest rates. Use for any question about loans, credit or borrowing.',
+    parameters: { type: 'OBJECT', properties: { amount: { type: 'NUMBER', description: 'Amount the owner wants, if they said one' } } },
+  },
+  {
     name: 'record_entry',
     description: 'Proposes ledger entries (sales, purchases, udhaar, payments, expenses) when the owner tells you about a transaction. They are shown to the owner as cards to confirm; nothing is saved until they tap save.',
     parameters: { type: 'OBJECT', properties: { entries: { type: 'ARRAY', items: ENTRY_SCHEMA } }, required: ['entries'] },
@@ -154,6 +184,51 @@ Return:
       ],
       schema: { type: 'OBJECT', properties: { profile: { type: 'STRING' }, improve: { type: 'STRING' }, tips: { type: 'ARRAY', items: { type: 'STRING' } } }, required: ['profile', 'improve', 'tips'] },
       temperature: 0.5,
+    });
+  },
+
+  async 'POST /api/offer'(b) {
+    const hi = b.lang === 'hi';
+    return generateJSON({
+      system: `You are a retail merchandising expert for Indian kirana shops. You design one offer to clear at-risk stock while protecting the shop's money.
+Rules: expiring stock should be cleared before the date, so price it to sell in time; only go below cost if it expires within 2 days, and say so. For slow, non-perishable stock prefer a combo with a fast-selling item over a deep discount. Round prices to whole rupees. ${hi ? 'Write the WhatsApp message in simple Hinglish (Roman script) and everything else in simple English.' : 'Write the WhatsApp message in friendly Hinglish (Roman script) that customers in a small Indian town read easily; everything else in plain English.'}`,
+      parts: [{ text: `Shop: ${b.shop}\nAt-risk item (JSON): ${JSON.stringify(b.candidate)}\nFast-selling items to pair with: ${(b.fast_movers || []).join(', ') || 'none'}\nDesign the offer.` }],
+      schema: {
+        type: 'OBJECT',
+        properties: {
+          headline: { type: 'STRING', description: 'Max 6 words' },
+          offer_type: { type: 'STRING', enum: ['discount', 'bundle', 'bogo', 'combo'] },
+          discount_pct: { type: 'NUMBER' },
+          bundle_with: { type: 'STRING', nullable: true },
+          offer_price: { type: 'NUMBER', description: 'Price per unit after the offer' },
+          valid_days: { type: 'INTEGER' },
+          whatsapp_message: { type: 'STRING', description: 'Under 280 characters, one emoji, mentions the shop' },
+          poster_tagline: { type: 'STRING', description: 'Max 7 words' },
+          reasoning: { type: 'STRING', description: '1–2 sentences for the owner, with rupee amounts: money recovered vs lost' },
+        },
+        required: ['headline', 'offer_type', 'discount_pct', 'offer_price', 'valid_days', 'whatsapp_message', 'poster_tagline', 'reasoning'],
+      },
+      temperature: 0.7,
+    });
+  },
+
+  async 'POST /api/loan-advice'(b) {
+    const hi = b.lang === 'hi';
+    return generateJSON({
+      system: `You are a responsible micro-lending advisor for an Indian kirana shop owner. Recommend the loan that fits the shop's cash flow: daily repayment should stay under about 25% of average daily profit. Mention udhaar if collecting it would reduce borrowing. Only recommend offers marked eligible. Speak ${hi ? 'in simple Hinglish (Roman script)' : 'in plain, warm English'}; rupees as ₹ with Indian grouping.`,
+      parts: [{ text: `Shop data (JSON): ${JSON.stringify(b)}` }],
+      schema: {
+        type: 'OBJECT',
+        properties: {
+          productId: { type: 'STRING' },
+          amount: { type: 'NUMBER', description: 'Multiple of 5000' },
+          months: { type: 'INTEGER', description: 'One of the chosen offer tenures' },
+          summary: { type: 'STRING', description: '2 sentences: what to take, from whom, and the daily repayment vs profit' },
+          risk: { type: 'STRING', description: 'One sentence on the main risk or a way to borrow less' },
+        },
+        required: ['productId', 'amount', 'months', 'summary', 'risk'],
+      },
+      temperature: 0.4,
     });
   },
 

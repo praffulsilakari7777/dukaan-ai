@@ -2,6 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { demoEntries } from './demo';
 import { strings, type Strings } from './i18n';
 import { buildLedger, keyOf, uid, type Ledger } from './ledger';
+import type { LoanApplication } from './lending';
+import type { ActiveOffer } from './offers';
 import type { Draft, Entry, EntrySource, Settings } from './types';
 
 const KEY = 'dukaan-ai:v1';
@@ -10,6 +12,8 @@ interface Persisted {
   entries: Entry[];
   phones: Record<string, string>;
   settings: Settings;
+  offers: ActiveOffer[];
+  loans: LoanApplication[];
 }
 
 const DEFAULT_SETTINGS: Settings = { shopName: 'Sharma Kirana Store', ownerName: 'Ramesh', lang: 'en', voiceLang: 'hi-IN', model: 'gemini-2.5-flash' };
@@ -19,13 +23,13 @@ function load(): Persisted {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const p = JSON.parse(raw) as Persisted;
-      return { entries: p.entries ?? [], phones: p.phones ?? {}, settings: { ...DEFAULT_SETTINGS, ...p.settings } };
+      return { entries: p.entries ?? [], phones: p.phones ?? {}, settings: { ...DEFAULT_SETTINGS, ...p.settings }, offers: p.offers ?? [], loans: p.loans ?? [] };
     }
   } catch {
     /* storage unavailable: start fresh in memory */
   }
   // First open: start with demo data so the app never greets a judge with zeros.
-  return { ...demoEntries(), settings: DEFAULT_SETTINGS };
+  return { ...demoEntries(), settings: DEFAULT_SETTINGS, offers: [], loans: [] };
 }
 
 interface Store extends Persisted {
@@ -36,6 +40,9 @@ interface Store extends Persisted {
   removeEntry: (id: string) => void;
   setPhone: (customer: string, phone: string) => void;
   updateSettings: (s: Partial<Settings>) => void;
+  addOffer: (o: ActiveOffer) => void;
+  endOffer: (id: string) => void;
+  applyLoan: (a: LoanApplication) => void;
   loadDemo: () => void;
   reset: () => void;
   toast: (msg: string) => void;
@@ -79,8 +86,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     removeEntry: (id) => setData((p) => ({ ...p, entries: p.entries.filter((e) => e.id !== id) })),
     setPhone: (customer, phone) => setData((p) => ({ ...p, phones: { ...p.phones, [keyOf(customer)]: phone.replace(/\D/g, '') } })),
     updateSettings: (s) => setData((p) => ({ ...p, settings: { ...p.settings, ...s } })),
-    loadDemo: () => setData((p) => ({ ...p, ...demoEntries() })),
-    reset: () => setData((p) => ({ entries: [], phones: {}, settings: p.settings })),
+    addOffer: (o) => setData((p) => ({ ...p, offers: [o, ...p.offers.filter((x) => x.item !== o.item)] })),
+    endOffer: (id) => setData((p) => ({ ...p, offers: p.offers.filter((x) => x.id !== id) })),
+    applyLoan: (a) => setData((p) => ({ ...p, loans: [a, ...p.loans] })),
+    loadDemo: () => setData((p) => ({ ...p, ...demoEntries(), offers: [], loans: [] })),
+    reset: () => setData((p) => ({ entries: [], phones: {}, settings: p.settings, offers: [], loans: [] })),
     toast,
     toastMsg,
   };

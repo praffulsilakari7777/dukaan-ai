@@ -1,4 +1,4 @@
-import { BookUser, CheckCircle2, Home as HomeIcon, Languages, Lightbulb, Package, Plus, Settings as Cog, Sparkles } from 'lucide-react';
+import { BookUser, CheckCircle2, Home as HomeIcon, Landmark, Languages, Lightbulb, Package, Plus, Settings as Cog, Sparkles, Tag } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { health } from './lib/api';
 import { useStore } from './lib/store';
@@ -8,10 +8,13 @@ import { AskSheet } from './screens/Ask';
 import { Home } from './screens/Home';
 import { Insights } from './screens/Insights';
 import { Khata } from './screens/Khata';
+import { Loans } from './screens/Loans';
+import { Offers } from './screens/Offers';
+import { offerCandidates } from './lib/offers';
 import { SettingsSheet } from './screens/Settings';
 import { Stock } from './screens/Stock';
 
-export type Tab = 'home' | 'stock' | 'khata' | 'insights';
+export type Tab = 'home' | 'stock' | 'khata' | 'insights' | 'offers' | 'loans';
 type Overlay = null | 'add' | 'ask' | 'ask-voice' | 'settings';
 
 export function Logo({ size = 34 }: { size?: number }) {
@@ -58,14 +61,16 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [overlay]);
 
-  const titles: Record<Tab, string> = { home: t.home, stock: t.stock, khata: t.khata, insights: t.insights };
-  const icons = { home: HomeIcon, stock: Package, khata: BookUser, insights: Lightbulb };
-  const badges: Partial<Record<Tab, number>> = { stock: ledger.lowCount, khata: ledger.customers.filter((c) => c.due > 0).length };
+  const titles: Record<Tab, string> = { home: t.home, stock: t.stock, khata: t.khata, insights: t.insights, offers: 'Smart offers', loans: 'Loans' };
+  const icons = { home: HomeIcon, stock: Package, khata: BookUser, insights: Lightbulb, offers: Tag, loans: Landmark };
+  const badges: Partial<Record<Tab, number>> = { stock: ledger.lowCount, khata: ledger.customers.filter((c) => c.due > 0).length, offers: offerCandidates(ledger).length };
+  // On phones, Offers lives under Stock and Loans under Insights.
+  const parent: Partial<Record<Tab, Tab>> = { offers: 'stock', loans: 'insights' };
 
   const navItem = (id: Tab) => {
     const Icon = icons[id];
     return (
-      <button key={id} className={`nav-item${tab === id ? ' on' : ''}`} onClick={() => setTab(id)} aria-current={tab === id ? 'page' : undefined}>
+      <button key={id} className={`nav-item${tab === id || (!wide && parent[tab] === id) ? ' on' : ''}`} onClick={() => setTab(id)} aria-current={tab === id ? 'page' : undefined}>
         <span className="dot">
           <Icon size={wide ? 19 : 22} strokeWidth={tab === id ? 2.4 : 2} />
           {!wide && id === 'stock' && !!badges.stock && <span className="badge num">{badges.stock}</span>}
@@ -95,6 +100,8 @@ export default function App() {
         </button>
         <nav className="side-nav" aria-label="Main">
           {(['home', 'stock', 'khata', 'insights'] as Tab[]).map(navItem)}
+          <span className="side-group">Grow</span>
+          {(['offers', 'loans'] as Tab[]).map(navItem)}
         </nav>
         <div className="side-foot">
           <div className="shop-card">
@@ -131,9 +138,11 @@ export default function App() {
         )}
 
         {tab === 'home' && <Home go={setTab} openAdd={() => setOverlay('add')} openAsk={(v, q) => { setAskQ(q); setOverlay(v ? 'ask-voice' : 'ask'); }} openSettings={() => setOverlay('settings')} />}
-        {tab === 'stock' && <Stock openAdd={() => setOverlay('add')} />}
+        {tab === 'stock' && <Stock openAdd={() => setOverlay('add')} go={setTab} />}
         {tab === 'khata' && <Khata />}
-        {tab === 'insights' && <Insights />}
+        {tab === 'insights' && <Insights go={setTab} />}
+        {tab === 'offers' && <Offers back={() => setTab('stock')} />}
+        {tab === 'loans' && <Loans back={() => setTab('insights')} />}
       </main>
 
       <nav className="nav" aria-label="Main">

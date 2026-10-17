@@ -1,7 +1,8 @@
-import { ArrowRight, BellRing, ChevronRight, Languages, Mic, Package, Pause, Play, Settings as Cog, Sparkles, Wallet } from 'lucide-react';
+import { ArrowRight, BellRing, CalendarClock, ChevronRight, Languages, Mic, Package, Pause, Play, Settings as Cog, Sparkles, Wallet } from 'lucide-react';
 import { useState } from 'react';
 import { briefing, OfflineError } from '../lib/api';
 import { daysSince, fmtQty, inr, relTime, startOfDay } from '../lib/ledger';
+import { offerCandidates } from '../lib/offers';
 import { useSpeaker } from '../lib/speech';
 import { useStore } from '../lib/store';
 import type { Entry } from '../lib/types';
@@ -55,6 +56,7 @@ export function Home({ go, openAdd, openAsk, openSettings }: { go: (t: Tab) => v
   const weekSales = ledger.days.reduce((s, d) => s + d.sales, 0);
 
   const low = ledger.stock.filter((s) => s.low);
+  const expiring = offerCandidates(ledger).filter((c) => c.reason === 'expiring');
   const overdue = ledger.customers.filter((c) => c.due > 0 && daysSince(c.lastPaymentTs || c.history[c.history.length - 1]?.ts || 0) >= 30);
 
   const recent = [...entries].sort((a, b) => b.ts - a.ts).slice(0, 12);
@@ -169,7 +171,7 @@ export function Home({ go, openAdd, openAsk, openSettings }: { go: (t: Tab) => v
         <section className="a-attn panel">
           <div className="block-head">
             <h2>Needs attention</h2>
-            <span>{low.length + overdue.length ? `${low.length + overdue.length} to act on` : 'All clear'}</span>
+            <span>{low.length + overdue.length + expiring.length ? `${(low.length ? 1 : 0) + overdue.length + (expiring.length ? 1 : 0)} to act on` : 'All clear'}</span>
           </div>
           <ul className="attn">
             {low.length > 0 && (
@@ -192,7 +194,27 @@ export function Home({ go, openAdd, openAsk, openSettings }: { go: (t: Tab) => v
                 </button>
               </li>
             )}
-            {overdue.slice(0, 2).map((c) => (
+            {expiring.length > 0 && (
+              <li>
+                <span className="attn-ic bad">
+                  <CalendarClock size={18} />
+                </span>
+                <div className="attn-main">
+                  <b>
+                    {expiring
+                      .slice(0, 2)
+                      .map((c) => c.item)
+                      .join(' and ')}
+                    {expiring.length > 2 ? ` +${expiring.length - 2}` : ''} expiring soon
+                  </b>
+                  <span className="num">{inr(expiring.reduce((s, c) => s + c.atRiskValue, 0))} of stock at risk</span>
+                </div>
+                <button className="attn-act" onClick={() => go('offers')}>
+                  Offer
+                </button>
+              </li>
+            )}
+            {overdue.slice(0, 1).map((c) => (
               <li key={c.key}>
                 <span className="attn-ic bad">
                   <Wallet size={18} />

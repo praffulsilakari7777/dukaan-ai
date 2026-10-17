@@ -122,3 +122,6 @@ export async function resizeImage(file: Blob, max = 1400): Promise<string> {
   c.getContext('2d')!.drawImage(bmp, 0, 0, c.width, c.height);
   return c.toDataURL('image/jpeg', 0.85);
 }
+
+export const generateOffer = (body: unknown) => post<import('./offers').OfferPlan>('offer', body);
+export const loanAdvice = (body: unknown) => post<{ amount: number; months: number; productId: string; summary: string; risk: string }>('loan-advice', body);
