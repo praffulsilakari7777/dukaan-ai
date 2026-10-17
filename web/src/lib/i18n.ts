@@ -1,0 +1,70 @@
+import type { Lang } from './types';
+
+const en = {
+  home: 'Home', stock: 'Stock', khata: 'Khata', insights: 'Insights', add: 'Add',
+  todayProfit: "Today's profit", todaySales: "Today's sales", udhaarDue: 'Udhaar due', lowStock: 'Low stock',
+  last7: 'Last 7 days', recent: 'Recent entries', seeAll: 'See all', noEntries: 'No entries yet',
+  noEntriesHint: 'Tap + and say your first sale, like "5 kg chawal becha 300".',
+  askPlaceholder: 'Ask Dukaan anything…', askTitle: 'Ask Dukaan',
+  speak: 'Speak', type: 'Type', bill: 'Bill photo',
+  tapToSpeak: 'Tap and speak', listening: 'Listening… tap to stop', understanding: 'Understanding…',
+  typeHint: 'Type a sale, purchase, udhaar or payment', tryThese: 'Try one',
+  understand: 'Understand', check: 'Check before saving', checkSub: 'Remove anything that is wrong, then save.',
+  saveAll: 'Save all', discard: 'Discard', saved: 'Saved', nothingFound: "Couldn't find an entry in that. Try saying the item, quantity and amount.",
+  scanBill: 'Scan bill', takePhoto: 'Take photo', upload: 'Upload', sampleBill: 'Use a sample bill', retake: 'Retake',
+  scanning: 'Reading every line…',
+  sale: 'Sale', purchase: 'Purchase', payment: 'Payment in', expense: 'Expense', udhaarSale: 'Udhaar sale',
+  stockValue: 'Stock value', items: 'items', ok: 'OK', low: 'Low', out: 'Out', avgCost: 'avg cost', sells: 'sells at',
+  daysLeft: 'days left', noStock: 'No stock yet', noStockHint: 'Scan a supplier bill to fill your shelf in one go.',
+  toCollect: 'To collect', customers: 'customers', due: 'Due', clear: 'Clear', lenaHai: 'Lena hai',
+  noCustomers: 'No udhaar yet', noCustomersHint: 'Say "Ramesh ne 2 kg dal udhaar liya 240" to start a khata.',
+  balance: 'Balance', recordPayment: 'Record payment', jama: 'Jama', amount: 'Amount', remind: 'WhatsApp reminder',
+  phone: 'WhatsApp number', history: 'History', lastPaid: 'Last paid',
+  score: 'Dukaan Score', loanReady: 'Eligible micro-loan', notYet: 'Not yet eligible', explain: 'Credit profile',
+  reorder: 'Reorder soon', slow: 'Slow movers', aiTips: 'AI salah', draftOrder: 'Draft order', makePromo: 'Make offer',
+  settings: 'Settings', shopName: 'Shop name', ownerName: 'Owner name', language: 'App language', voiceLang: 'Voice language',
+  loadDemo: 'Load demo data', reset: 'Reset all data', aiStatus: 'AI status', online: 'Gemini online', offline: 'Offline mode',
+  morning: 'Morning briefing', play: 'Play', stop: 'Stop',
+  goodMorning: 'Good morning', goodAfternoon: 'Good afternoon', goodEvening: 'Good evening',
+};
+
+const hi: typeof en = {
+  home: 'Ghar', stock: 'Stock', khata: 'Khata', insights: 'Salah', add: 'Jodo',
+  todayProfit: 'Aaj ka munafa', todaySales: 'Aaj ki bikri', udhaarDue: 'Udhaar baaki', lowStock: 'Kam stock',
+  last7: 'Pichhle 7 din', recent: 'Haal ki entries', seeAll: 'Sab dekho', noEntries: 'Abhi koi entry nahi',
+  noEntriesHint: '+ dabao aur bolo, jaise "5 kg chawal becha 300".',
+  askPlaceholder: 'Dukaan se kuch bhi poocho…', askTitle: 'Ask Dukaan',
+  speak: 'Bolo', type: 'Likho', bill: 'Bill photo',
+  tapToSpeak: 'Dabao aur bolo', listening: 'Sun raha hoon… rokne ke liye dabao', understanding: 'Samajh raha hoon…',
+  typeHint: 'Bikri, kharid, udhaar ya jama likho', tryThese: 'Aise bolo',
+  understand: 'Samjho', check: 'Check karein', checkSub: 'Galat card hatao, phir save karo.',
+  saveAll: 'Sab save karo', discard: 'Hatao', saved: 'Save ho gaya', nothingFound: 'Isme koi entry nahi mili. Saaman, matra aur rakam bolo.',
+  scanBill: 'Bill scan karo', takePhoto: 'Photo lo', upload: 'Upload', sampleBill: 'Sample bill lo', retake: 'Phir se',
+  scanning: 'Har line padh raha hoon…',
+  sale: 'Bikri', purchase: 'Kharid', payment: 'Jama', expense: 'Kharcha', udhaarSale: 'Udhaar bikri',
+  stockValue: 'Stock ki keemat', items: 'saaman', ok: 'OK', low: 'Kam', out: 'Khatam', avgCost: 'ausat lagat', sells: 'bikta',
+  daysLeft: 'din bache', noStock: 'Abhi stock nahi', noStockHint: 'Supplier ka bill scan karo, sab stock ek baar mein.',
+  toCollect: 'Lena hai', customers: 'grahak', due: 'Baaki', clear: 'Clear', lenaHai: 'Lena hai',
+  noCustomers: 'Abhi udhaar nahi', noCustomersHint: 'Bolo "Ramesh ne 2 kg dal udhaar liya 240".',
+  balance: 'Baaki', recordPayment: 'Jama likho', jama: 'Jama', amount: 'Rakam', remind: 'WhatsApp yaad dilao',
+  phone: 'WhatsApp number', history: 'Hisaab', lastPaid: 'Pichhla jama',
+  score: 'Dukaan Score', loanReady: 'Milne layak loan', notYet: 'Abhi loan layak nahi', explain: 'Credit profile',
+  reorder: 'Jaldi mangwao', slow: 'Dheere bikne wale', aiTips: 'AI salah', draftOrder: 'Order banao', makePromo: 'Offer banao',
+  settings: 'Settings', shopName: 'Dukaan ka naam', ownerName: 'Maalik ka naam', language: 'App ki bhasha', voiceLang: 'Bolne ki bhasha',
+  loadDemo: 'Demo data daalo', reset: 'Sab data mitao', aiStatus: 'AI status', online: 'Gemini chalu', offline: 'Offline mode',
+  morning: 'Subah ki report', play: 'Suno', stop: 'Roko',
+  goodMorning: 'Namaste, suprabhat', goodAfternoon: 'Namaste', goodEvening: 'Shubh sandhya',
+};
+
+export type Strings = typeof en;
+export const strings: Record<Lang, Strings> = { en, hi };
+
+export const VOICE_LANGS = [
+  { code: 'hi-IN', label: 'Hindi / Hinglish' },
+  { code: 'en-IN', label: 'English (India)' },
+  { code: 'te-IN', label: 'Telugu' },
+  { code: 'ta-IN', label: 'Tamil' },
+  { code: 'mr-IN', label: 'Marathi' },
+  { code: 'bn-IN', label: 'Bengali' },
+  { code: 'gu-IN', label: 'Gujarati' },
+];

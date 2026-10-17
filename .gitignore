@@ -1,0 +1,9 @@
+node_modules
+dist
+.env
+*.local
+video/out
+video/node_modules
+*-sa.json
+service-account*.json
+.DS_Store
