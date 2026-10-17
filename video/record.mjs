@@ -17,6 +17,7 @@ const OUT = join(HERE, 'out');
 const FRAMES = join(OUT, 'frames');
 const VO = join(OUT, 'vo');
 const APP = process.env.APP_URL || 'http://localhost:8080';
+const GEMINI = await fetch(`${APP}/api/health`).then((r) => r.json()).then((h) => h.gemini).catch(() => false);
 const VOICE = process.env.TTS_VOICE || 'en-US-Studio-O';
 const SAY_VOICE = process.env.SAY_VOICE || 'Daniel';
 
@@ -154,21 +155,72 @@ const SCENES = [
     },
   },
   {
-    id: 'score',
-    vo: 'Every entry builds his Dukaan Score, from three hundred to nine hundred. Gemini explains it as a credit profile a lender can understand, and shows the micro-loan the shop already qualifies for.',
+    id: 'offers',
+    vo: 'Dukaan AI also watches every expiry date and how fast each item sells. When paneer is about to expire, Gemini designs an offer that clears the stock before it goes to waste, without giving away the margin. It creates the poster and the message, ready to share on WhatsApp in one tap.',
     async run({ stage, app }) {
-      await stage('caption', { step: '06 · Dukaan Score', title: 'Records that<br>unlock credit.', body: 'A 300–900 loan-readiness score from active days, sales, udhaar collected and profitability.', tags: ['<b>Gemini</b> credit profile', 'Micro-loan estimate'] });
+      await stage('caption', { step: '06 · Smart offers', title: 'Clear stock before<br>it expires.', body: 'Expiring and slow-moving items are spotted automatically. Gemini designs the offer, the poster and the message.', tags: ['<b>Gemini</b> offer design', 'Margin guardrails', 'Shop poster'] });
       await app.getByRole('button', { name: 'Close' }).click();
-      await wait(600);
-      await app.locator('.nav').getByRole('button', { name: 'Insights' }).click();
+      await wait(500);
+      await app.locator('.nav').getByRole('button', { name: /Stock/ }).click();
+      await wait(1400);
+      await app.locator('.risk-banner').click();
+      await wait(1800);
+      await app.getByRole('button', { name: /Create offer with AI/ }).first().click();
+      await app.locator('.poster-frame img').waitFor({ timeout: 60_000 });
+      await wait(1800);
+      if (GEMINI) {
+        await app.locator('.poster-seg button').nth(1).click();
+        await app.locator('.poster-frame img').waitFor({ timeout: 95_000 });
+        await wait(2500);
+      } else await wait(800);
+      await app.locator('.sheet-body').evaluate((el) => el.scrollTo({ top: 420, behavior: 'smooth' }));
       await wait(2200);
-      await app.locator('.screen').evaluate((el) => el.scrollTo({ top: 380, behavior: 'smooth' }));
-      await wait(2500);
+      await app.getByRole('button', { name: /Start offer/ }).click();
+      await wait(1200);
+    },
+  },
+  {
+    id: 'loans',
+    vo: 'And every entry builds his Dukaan Score. With a strong score, Ramesh is pre-approved for credit. He picks an amount, sees the daily repayment against his real profit, asks the AI advisor, and applies with one tap, sharing only what he consents to.',
+    async run({ stage, app }) {
+      await stage('caption', { step: '07 · Credit, unlocked', title: 'From notebook<br>to loan-ready.', body: 'The Dukaan Score opens micro-loans. Repayments are sized to the shop’s daily profit, and consent stays with the owner.', tags: ['<b>Gemini</b> loan advisor', 'Account Aggregator consent', 'Daily repayment'] });
+      await app.locator('.nav').getByRole('button', { name: 'Insights' }).click();
+      await wait(1600);
+      await app.getByRole('button', { name: 'See loan offers' }).click();
+      await wait(2200);
+      await app.locator('.screen').evaluate((el) => el.scrollTo({ top: 640, behavior: 'smooth' }));
+      await wait(1600);
+      await app.getByRole('button', { name: /Ask the AI advisor/ }).click();
+      await app.locator('.advisor p').first().waitFor({ timeout: 60_000 });
+      await wait(2200);
+      await app.getByRole('button', { name: /Apply for/ }).click();
+      await wait(2200);
+      await app.getByRole('button', { name: /Agree and apply/ }).click();
+      await wait(5000);
+    },
+  },
+  {
+    id: 'lang',
+    vo: "Dukaan AI speaks the owner's language. The whole app, voice input, and every Gemini answer switch between English and eleven Indian languages, from Hindi and Bengali to Tamil and Malayalam, with a single tap.",
+    async run({ stage, app }) {
+      await stage('caption', { step: '08 · Built for Bharat', title: 'Twelve languages,<br>one tap.', body: 'Hindi, Hinglish, Bengali, Telugu, Marathi, Tamil, Gujarati, Kannada, Malayalam, Punjabi, Odia and English.', tags: ['Native scripts', 'Voice in every language', '<b>Gemini</b> answers in kind'] });
+      await app.locator('.nav').getByRole('button', { name: 'Home' }).click();
+      await wait(1200);
+      const pick = async (native) => {
+        await app.locator('.m-actions .ghost-icon').first().click();
+        await wait(1000);
+        await app.locator('.lang-opt', { hasText: native }).click();
+        await wait(2600);
+      };
+      await pick('हिन्दी');
+      await pick('தமிழ்');
+      await pick('বাংলা');
+      await pick('English');
     },
   },
   {
     id: 'web',
-    vo: "Dukaan AI works on any phone, and as a full web dashboard for family members who help run the business. It's powered by Gemini and deployed on Google Cloud Run.",
+    vo: "Dukaan AI works on any phone, and as a full web dashboard for family members who help run the business, with stock, offers and loans in one place. It's powered by Gemini and deployed on Google Cloud Run.",
     async run({ stage, desk, page }) {
       await page.evaluate(() => { const f = document.getElementById('deskapp'); f.src = f.src; });
       await desk.locator('.side').waitFor();
@@ -177,15 +229,17 @@ const SCENES = [
       await wait(2600);
       await desk.locator('.side').getByRole('button', { name: /Stock/ }).click();
       await wait(2400);
-      await desk.locator('.side').getByRole('button', { name: /Khata/ }).click();
+      await desk.locator('.side').getByRole('button', { name: /Smart offers/ }).click();
+      await wait(2400);
+      await desk.locator('.side').getByRole('button', { name: /Loans/ }).click();
       await wait(2200);
     },
   },
   {
     id: 'outro',
-    vo: "Next come a WhatsApp bot, GST invoicing, and lending partners. Dukaan AI. It listens, it keeps the books, and it helps India's small shops get credit.",
+    vo: "Next come a WhatsApp bot, GST invoicing, and real lending partners. Dukaan AI. It listens, it keeps the books, and it helps India's small shops get credit.",
     async run({ stage }) {
-      await stage('card', { title: 'Dukaan AI', sub: 'It listens. It keeps the books.<br>It helps India’s kirana stores get credit.', stats: [['Gemini', 'agent, vision & insights'], ['Cloud Run', 'deployed backend'], ['Next', 'WhatsApp · GST · NBFC lending']], foot: 'Google Cloud AI Builder Cup 2026 · Theme 2: Retail &amp; Commerce' });
+      await stage('card', { title: 'Dukaan AI', sub: 'It listens. It keeps the books.<br>It helps India’s kirana stores get credit.', stats: [['Gemini', 'agent, vision & insights'], ['Cloud Run', 'deployed backend'], ['Next', 'WhatsApp bot · GST · NBFC partners']], foot: 'Google Cloud AI Builder Cup 2026 · Theme 2: Retail &amp; Commerce' });
     },
   },
 ];
