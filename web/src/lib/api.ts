@@ -70,8 +70,16 @@ export async function parseText(text: string, ctx: { items: string[]; customers:
     return { drafts: toDrafts(r.entries), by: 'gemini' as const };
   } catch (e) {
     if (!(e instanceof OfflineError)) throw e;
-    return { drafts: offlineParse(text), by: 'offline' as const };
+    return { drafts: offlineParse(text).map((d) => (d.item ? { ...d, item: matchItem(d.item, ctx.items) } : d)), by: 'offline' as const };
   }
+}
+
+/** "Dal" said at the counter means the shop's only dal, "Toor Dal". */
+function matchItem(name: string, items: string[]) {
+  const n = name.toLowerCase();
+  if (items.some((i) => i.toLowerCase() === n)) return name;
+  const hits = items.filter((i) => i.toLowerCase().split(' ').includes(n));
+  return hits.length === 1 ? hits[0] : name;
 }
 
 export async function scanBill(dataUrl: string) {
