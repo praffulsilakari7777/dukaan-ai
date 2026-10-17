@@ -44,7 +44,7 @@ export function Home({ go, openAdd, openAsk, openSettings }: { go: (t: Tab) => v
   const hour = new Date().getHours();
   const greet = hour < 12 ? t.goodMorning : hour < 17 ? t.goodAfternoon : t.goodEvening;
   const max = Math.max(...ledger.days.map((d) => d.sales), 1);
-  const recent = [...entries].sort((a, b) => b.ts - a.ts).slice(0, 8);
+  const recent = [...entries].sort((a, b) => b.ts - a.ts).slice(0, 10);
   const today = ledger.today;
 
   async function playBriefing() {
@@ -67,6 +67,8 @@ export function Home({ go, openAdd, openAsk, openSettings }: { go: (t: Tab) => v
 
   return (
     <div className="screen">
+     <div className="home">
+      <div className="a-hero">
       <header className="hero">
         <div className="hero-top">
           <div className="hero-shop">
@@ -110,8 +112,9 @@ export function Home({ go, openAdd, openAsk, openSettings }: { go: (t: Tab) => v
           <Mic size={20} />
         </button>
       </div>
+      </div>
 
-      <div className="stats">
+      <div className="stats a-stats">
         <button className="stat" onClick={() => go('home')}>
           <div className="k">
             <TrendingUp size={13} /> {t.todaySales}
@@ -132,7 +135,7 @@ export function Home({ go, openAdd, openAsk, openSettings }: { go: (t: Tab) => v
         </button>
       </div>
 
-      <section className="section">
+      <section className="section a-brief">
         <div className="card">
           <div className="brief">
             <button className={`play${speaker.speaking ? ' on' : ''}`} onClick={playBriefing} aria-label={speaker.speaking ? t.stop : t.play} disabled={loadingBrief}>
@@ -157,7 +160,7 @@ export function Home({ go, openAdd, openAsk, openSettings }: { go: (t: Tab) => v
         </div>
       </section>
 
-      <section className="section">
+      <section className="section a-chart">
         <div className="section-head">
           <h2>{t.last7}</h2>
           <span className="aside-txt num">{inr(ledger.days.reduce((s, d) => s + d.sales, 0))}</span>
@@ -169,10 +172,10 @@ export function Home({ go, openAdd, openAsk, openSettings }: { go: (t: Tab) => v
               const isMax = d.sales === max && !isToday;
               return (
                 <div className="bar-col" key={d.day}>
-                  <span className="bar-val num" style={{ visibility: isToday || isMax ? 'visible' : 'hidden' }}>
-                    {d.sales >= 1000 ? `${(d.sales / 1000).toFixed(1)}k` : Math.round(d.sales)}
-                  </span>
-                  <div className={`bar${isToday ? ' today' : ''}`} style={{ height: `${Math.max((d.sales / max) * 100, 3)}%`, animationDelay: `${i * 40}ms` }} />
+                  <div className="bar-track">
+                    {(isToday || isMax) && <span className="bar-val num">{d.sales >= 1000 ? `${(d.sales / 1000).toFixed(1)}k` : Math.round(d.sales)}</span>}
+                    <div className={`bar${isToday ? ' today' : ''}`} style={{ height: `${Math.max((d.sales / max) * 82, 2)}%`, animationDelay: `${i * 40}ms` }} />
+                  </div>
                   <span className={`bar-lbl${isToday ? ' today' : ''}`}>{isToday ? 'Today' : d.label}</span>
                 </div>
               );
@@ -181,7 +184,7 @@ export function Home({ go, openAdd, openAsk, openSettings }: { go: (t: Tab) => v
         </div>
       </section>
 
-      <section className="section">
+      <section className="section a-recent">
         <div className="section-head">
           <h2>{t.recent}</h2>
         </div>
@@ -225,6 +228,7 @@ export function Home({ go, openAdd, openAsk, openSettings }: { go: (t: Tab) => v
         </div>
       </section>
 
+     </div>
       {entry && <EntrySheet entry={entry} onClose={() => setEntry(null)} />}
     </div>
   );

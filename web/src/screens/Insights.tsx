@@ -27,7 +27,7 @@ function insightSummary(ledger: Ledger, shop: string) {
 function offlineInsights(s: ReturnType<typeof insightSummary>): InsightResult {
   const weakest = [...(s.score_parts ?? [])].sort((a, b) => parseInt(a.achieved) - parseInt(b.achieved))[0];
   const top = s.top_profit_items[0];
-  const low = s.low_margin_items[0];
+  const low = s.low_margin_items.find((x) => x.item !== top?.item);
   return {
     profile: `${s.shop} records sales almost every day and earns about ${inr(s.week_profit)} a week on ${inr(s.week_sales)} of sales. ${s.udhaar_total > 0 ? `${inr(s.udhaar_total)} is out on udhaar with ${s.udhaar_customers} customers.` : 'There is no pending udhaar.'} With a score of ${s.dukaan_score}, the shop ${s.eligible_loan ? `can show a lender steady trade for a loan of around ${inr(s.eligible_loan)}.` : 'needs a few more weeks of records before applying for a loan.'}`,
     improve: weakest ? `Improve "${weakest.factor}" (now ${weakest.achieved}) for the biggest jump in your score.` : 'Keep recording every sale for 30 days.',
@@ -93,11 +93,11 @@ export function Insights() {
 
   return (
     <div className="screen">
-      <header className="page-head">
+      <header className="page-head only-narrow">
         <h1>{t.insights}</h1>
       </header>
-
-      <section className="section" style={{ marginTop: 0 }}>
+     <div className="ins-grid">
+      <section className="section a-score" style={{ marginTop: 0 }}>
         <div className="card">
           <div className="score-card">
             <div className="ring" role="img" aria-label={`Dukaan Score ${score.value} out of 900`}>
@@ -165,7 +165,7 @@ export function Insights() {
       </section>
 
       {reorder.length > 0 && (
-        <section className="section">
+        <section className="section a-reorder">
           <div className="section-head">
             <h2>{t.reorder}</h2>
             <button
@@ -199,7 +199,7 @@ export function Insights() {
       )}
 
       {slow.length > 0 && (
-        <section className="section">
+        <section className="section a-slow">
           <div className="section-head">
             <h2>{t.slow}</h2>
           </div>
@@ -223,7 +223,7 @@ export function Insights() {
         </section>
       )}
 
-      <section className="section">
+      <section className="section a-tips">
         <div className="section-head">
           <h2>{t.aiTips}</h2>
           {ai && <span className="aside-txt">{ai.by === 'gemini' ? 'by Gemini' : 'offline'}</span>}
@@ -240,6 +240,7 @@ export function Insights() {
           <Lightbulb size={14} style={{ flex: 'none' }} /> The Dukaan Score is a guide to loan readiness built from your own records, not a credit bureau score.
         </p>
       </section>
+     </div>
 
       {draft && (
         <Sheet title={draft.kind === 'order' ? 'Supplier order' : 'WhatsApp offer'} onClose={() => setDraft(null)}>

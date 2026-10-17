@@ -78,6 +78,7 @@ export function AskSheet({ onClose, startVoice }: { onClose: () => void; startVo
       }
       onClose={onClose}
       full
+      drawer
       foot={
         <form
           className="composer"

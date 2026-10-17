@@ -4,18 +4,20 @@ import { initials, Sheet } from '../components/ui';
 import { waLink } from '../lib/agent';
 import { daysSince, inr, relTime } from '../lib/ledger';
 import { useStore } from '../lib/store';
+import { useWide } from '../lib/useWide';
 import type { Customer } from '../lib/types';
 
 export function Khata() {
   const { ledger, t } = useStore();
+  const wide = useWide();
   const [open, setOpen] = useState<string | null>(null);
   const owing = ledger.customers.filter((c) => c.due > 0);
-  const current = open ? ledger.customers.find((c) => c.key === open) : null;
+  const current = open ? ledger.customers.find((c) => c.key === open) : wide ? ledger.customers[0] : null;
 
   return (
     <div className="screen">
       <header className="page-head">
-        <h1>{t.khata}</h1>
+        <h1 className="only-narrow">{t.khata}</h1>
         <div className="lead">
           <span className="big num" style={{ color: ledger.totalDue ? 'var(--bad)' : undefined }}>
             {inr(ledger.totalDue)}
@@ -26,7 +28,7 @@ export function Khata() {
         </div>
       </header>
 
-      <div className="section" style={{ marginTop: 0 }}>
+      <div className={`section${wide ? ' split' : ''}`} style={{ marginTop: 0 }}>
         <div className="card">
           {ledger.customers.length === 0 ? (
             <div className="empty">
@@ -42,7 +44,7 @@ export function Khata() {
                 const since = daysSince(c.lastPaymentTs || c.history[c.history.length - 1]?.ts || 0);
                 return (
                   <li key={c.key}>
-                    <button className="row" onClick={() => setOpen(c.key)}>
+                    <button className={`row${wide && current?.key === c.key ? ' sel' : ''}`} onClick={() => setOpen(c.key)}>
                       <span className="avatar">{initials(c.name)}</span>
                       <div className="main">
                         <div className="t">{c.name}</div>
@@ -63,13 +65,26 @@ export function Khata() {
             </ul>
           )}
         </div>
+        {wide && current && (
+          <div className="card detail">
+            <CustomerDetail c={current} />
+          </div>
+        )}
       </div>
-      {current && <CustomerSheet c={current} onClose={() => setOpen(null)} />}
+      {!wide && current && <CustomerSheet c={current} onClose={() => setOpen(null)} />}
     </div>
   );
 }
 
 function CustomerSheet({ c, onClose }: { c: Customer; onClose: () => void }) {
+  return (
+    <Sheet title={c.name} onClose={onClose} full>
+      <CustomerDetail c={c} />
+    </Sheet>
+  );
+}
+
+function CustomerDetail({ c }: { c: Customer }) {
   const { t, addEntry, setPhone, toast, settings } = useStore();
   const [amt, setAmt] = useState('');
   const [phone, setPhoneInput] = useState(c.phone ?? '');
@@ -89,26 +104,14 @@ function CustomerSheet({ c, onClose }: { c: Customer; onClose: () => void }) {
   };
 
   return (
-    <Sheet
-      title={c.name}
-      onClose={onClose}
-      full
-      foot={
-        c.due > 0 ? (
-          <a
-            className="btn wa block"
-            href={waLink(reminder)}
-            target="_blank"
-            rel="noreferrer"
-            onClick={() => {
-              if (reminder.phone && reminder.phone !== c.phone) setPhone(c.name, reminder.phone);
-            }}
-          >
-            <MessageCircle size={18} /> {t.remind}
-          </a>
-        ) : undefined
-      }
-    >
+    <div key={c.key}>
+      <div className="detail-head">
+        <span className="avatar lg">{initials(c.name)}</span>
+        <div>
+          <h2>{c.name}</h2>
+          <span>{c.history.length} entries in khata</span>
+        </div>
+      </div>
       <div className="balance">
         <div className="k">{t.balance}</div>
         <div className={`v num ${c.due > 0 ? 'bad' : 'good'}`}>{inr(Math.max(c.due, 0))}</div>
@@ -168,6 +171,20 @@ function CustomerSheet({ c, onClose }: { c: Customer; onClose: () => void }) {
           ))}
         </ul>
       </div>
-    </Sheet>
+      {c.due > 0 && (
+        <a
+          className="btn wa block"
+          style={{ marginTop: 16 }}
+          href={waLink(reminder)}
+          target="_blank"
+          rel="noreferrer"
+          onClick={() => {
+            if (reminder.phone && reminder.phone !== c.phone) setPhone(c.name, reminder.phone);
+          }}
+        >
+          <MessageCircle size={18} /> {t.remind}
+        </a>
+      )}
+    </div>
   );
 }

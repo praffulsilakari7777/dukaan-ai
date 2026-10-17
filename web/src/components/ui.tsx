@@ -6,7 +6,7 @@ import { fmtQty, inr } from '../lib/ledger';
 import { useStore } from '../lib/store';
 import type { Draft, Entry } from '../lib/types';
 
-export function Sheet({ title, onClose, children, foot, full }: { title: ReactNode; onClose: () => void; children: ReactNode; foot?: ReactNode; full?: boolean }) {
+export function Sheet({ title, onClose, children, foot, full, drawer }: { title: ReactNode; onClose: () => void; children: ReactNode; foot?: ReactNode; full?: boolean; drawer?: boolean }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
@@ -15,7 +15,7 @@ export function Sheet({ title, onClose, children, foot, full }: { title: ReactNo
   return (
     <>
       <div className="scrim" onClick={onClose} />
-      <section className={`sheet${full ? ' full' : ''}`} role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined}>
+      <section className={`sheet${full ? ' full' : ''}${drawer ? ' drawer' : ''}`} role="dialog" aria-modal="true" aria-label={typeof title === 'string' ? title : undefined}>
         <div className="sheet-grab" />
         <header className="sheet-head">
           <h2>{title}</h2>
