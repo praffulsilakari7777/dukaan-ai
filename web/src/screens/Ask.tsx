@@ -31,7 +31,7 @@ const fmtArgs = (a: Record<string, unknown>) =>
     .map(([k, v]) => `${k}: ${typeof v === 'object' ? (Array.isArray(v) ? `[${v.length}]` : '{…}') : JSON.stringify(v)}`)
     .join(', ');
 
-export function AskSheet({ onClose, startVoice }: { onClose: () => void; startVoice?: boolean }) {
+export function AskSheet({ onClose, startVoice, initial }: { onClose: () => void; startVoice?: boolean; initial?: string }) {
   const store = useStore();
   const { t, settings, ledger, entries, phones, saveDrafts, toast } = store;
   const [turns, setTurns] = useState<Turn[]>([]);
@@ -42,7 +42,8 @@ export function AskSheet({ onClose, startVoice }: { onClose: () => void; startVo
   const voice = useVoice(settings.voiceLang, (s) => ask(s));
 
   useEffect(() => {
-    if (startVoice) voice.start();
+    if (initial) ask(initial);
+    else if (startVoice) voice.start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {

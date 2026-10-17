@@ -1,7 +1,7 @@
-import { AlertTriangle, BookUser, Mic, Pause, Play, Settings as Cog, Sparkles, TrendingUp } from 'lucide-react';
+import { ArrowRight, BellRing, ChevronRight, Languages, Mic, Package, Pause, Play, Settings as Cog, Sparkles, Wallet } from 'lucide-react';
 import { useState } from 'react';
 import { briefing, OfflineError } from '../lib/api';
-import { fmtQty, inr, relTime } from '../lib/ledger';
+import { daysSince, fmtQty, inr, relTime, startOfDay } from '../lib/ledger';
 import { useSpeaker } from '../lib/speech';
 import { useStore } from '../lib/store';
 import type { Entry } from '../lib/types';
@@ -26,26 +26,46 @@ export function briefingSummary(store: ReturnType<typeof useStore>) {
 }
 
 function offlineBriefing(s: ReturnType<typeof briefingSummary>, lang: string) {
-  const low = s.running_low.map((r) => r.item).join(', ');
+  const low = s.running_low.map((r) => r.item).join(' and ');
   const due = s.top_udhaar[0];
   if (lang === 'hi')
     return `Namaste ${s.owner} ji. Kal aapki bikri ${inr(s.yesterday.sales)} rahi, aur munafa ${inr(s.yesterday.profit)}. ${low ? `${low} jaldi khatam hone wale hain, aaj order kar dijiye.` : 'Stock theek hai.'} ${due ? `Sabse zyada udhaar ${due.name} ka hai, ${inr(due.due)}.` : ''} Aapka Dukaan Score ${s.dukaan_score} hai. Aaj ka din shubh ho!`;
   return `Good morning ${s.owner}. Yesterday you sold ${inr(s.yesterday.sales)} and made ${inr(s.yesterday.profit)} profit. ${low ? `${low} will run out soon, so place an order today.` : 'Your stock looks healthy.'} ${due ? `The biggest udhaar is ${due.name}, at ${inr(due.due)}.` : ''} Your Dukaan Score is ${s.dukaan_score}. Have a good day!`;
 }
 
-export function Home({ go, openAdd, openAsk, openSettings }: { go: (t: Tab) => void; openAdd: () => void; openAsk: (voice?: boolean) => void; openSettings: () => void }) {
+const SUGGESTED = ["Who hasn't paid in 30 days?", 'Which item made the most profit this week?', 'What should I reorder today?'];
+
+type OpenAsk = (voice?: boolean, q?: string) => void;
+
+export function Home({ go, openAdd, openAsk, openSettings }: { go: (t: Tab) => void; openAdd: () => void; openAsk: OpenAsk; openSettings: () => void }) {
   const store = useStore();
   const { ledger, t, settings, entries, updateSettings } = store;
   const [entry, setEntry] = useState<Entry | null>(null);
   const [script, setScript] = useState<string | null>(null);
   const [loadingBrief, setLoadingBrief] = useState(false);
+  const [sel, setSel] = useState(ledger.days.length - 1);
   const speaker = useSpeaker();
 
-  const hour = new Date().getHours();
+  const now = new Date();
+  const hour = now.getHours();
   const greet = hour < 12 ? t.goodMorning : hour < 17 ? t.goodAfternoon : t.goodEvening;
   const max = Math.max(...ledger.days.map((d) => d.sales), 1);
-  const recent = [...entries].sort((a, b) => b.ts - a.ts).slice(0, 10);
   const today = ledger.today;
+  const day = ledger.days[sel] ?? ledger.days[ledger.days.length - 1];
+  const weekSales = ledger.days.reduce((s, d) => s + d.sales, 0);
+
+  const low = ledger.stock.filter((s) => s.low);
+  const overdue = ledger.customers.filter((c) => c.due > 0 && daysSince(c.lastPaymentTs || c.history[c.history.length - 1]?.ts || 0) >= 30);
+
+  const recent = [...entries].sort((a, b) => b.ts - a.ts).slice(0, 12);
+  const t0 = startOfDay();
+  const groups: { label: string; items: Entry[] }[] = [];
+  for (const e of recent) {
+    const label = e.ts >= t0 ? 'Today' : e.ts >= t0 - 86_400_000 ? 'Yesterday' : new Date(e.ts).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+    const g = groups[groups.length - 1];
+    if (g?.label === label) g.items.push(e);
+    else groups.push({ label, items: [e] });
+  }
 
   async function playBriefing() {
     if (speaker.speaking) return speaker.stop();
@@ -67,128 +87,186 @@ export function Home({ go, openAdd, openAsk, openSettings }: { go: (t: Tab) => v
 
   return (
     <div className="screen">
-     <div className="home">
-      <div className="a-hero">
-      <header className="hero">
-        <div className="hero-top">
-          <div className="hero-shop">
-            <div className="greet">
+      <div className="home">
+        <header className="m-head only-narrow">
+          <div>
+            <span className="m-greet">
               {greet}, {settings.ownerName}
-            </div>
-            <div className="name">{settings.shopName}</div>
+            </span>
+            <b className="m-shop">{settings.shopName}</b>
           </div>
-          <div className="hero-actions">
-            <button className="icon-btn lang-btn" onClick={() => updateSettings({ lang: settings.lang === 'en' ? 'hi' : 'en' })} aria-label="Switch language">
-              {settings.lang === 'en' ? 'हिं' : 'EN'}
+          <div className="m-actions">
+            <button className="ghost-icon" onClick={() => updateSettings({ lang: settings.lang === 'en' ? 'hi' : 'en' })} aria-label="Switch language">
+              <Languages size={19} />
             </button>
-            <button className="icon-btn" onClick={openSettings} aria-label={t.settings}>
+            <button className="ghost-icon" onClick={openSettings} aria-label={t.settings}>
               <Cog size={19} />
             </button>
           </div>
-        </div>
-        <div className="hero-figure">
-          <div className="label">{t.todayProfit}</div>
-          <div className={`value num${today.profit < 0 ? ' neg' : ''}`}>{inr(today.profit)}</div>
-          <div className="hero-sub num">
-            <span>
-              Cash in <b>{inr(today.received)}</b>
-            </span>
-            <span>
-              <b>{today.count}</b> {today.count === 1 ? 'entry' : 'entries'}
-            </span>
-          </div>
-        </div>
-      </header>
+        </header>
 
-      <div className="ask-bar">
-        <button className="ask-main" onClick={() => openAsk()}>
-          <Sparkles className="spark" size={22} />
-          <span className="ph">
-            <b>{t.askTitle}</b>
-            <span>“Who hasn’t paid in 30 days?”</span>
-          </span>
-        </button>
-        <button className="mic-sm" aria-label="Ask by voice" onClick={() => openAsk(true)}>
-          <Mic size={20} />
-        </button>
-      </div>
-      </div>
+        <section className="a-hero">
+          <div className="summary">
+            <div className="sum-label">
+              <span>{t.todayProfit}</span>
+              <span className="sum-live">
+                <i /> {now.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })}
+              </span>
+            </div>
+            <div className={`sum-value num${today.profit < 0 ? ' neg' : ''}`}>{inr(today.profit)}</div>
+            <div className="sum-note">
+              From {today.count} {today.count === 1 ? 'entry' : 'entries'} today, after cost of goods and expenses
+            </div>
+            <dl className="sum-metrics">
+              <div>
+                <dt>{t.todaySales}</dt>
+                <dd className="num">{inr(today.sales)}</dd>
+              </div>
+              <div>
+                <dt>Cash in</dt>
+                <dd className="num">{inr(today.received)}</dd>
+              </div>
+              <div className="sum-link" role="button" tabIndex={0} onClick={() => go('khata')} onKeyDown={(e) => e.key === 'Enter' && go('khata')}>
+                <dt>{t.udhaarDue}</dt>
+                <dd className="num">
+                  {inr(ledger.totalDue)} <ChevronRight size={15} />
+                </dd>
+              </div>
+            </dl>
+          </div>
+        </section>
 
-      <div className="stats a-stats">
-        <button className="stat" onClick={() => go('home')}>
-          <div className="k">
-            <TrendingUp size={13} /> {t.todaySales}
-          </div>
-          <div className="v num">{inr(today.sales)}</div>
-        </button>
-        <button className="stat" onClick={() => go('khata')}>
-          <div className="k">
-            <BookUser size={13} /> {t.udhaarDue}
-          </div>
-          <div className={`v num${ledger.totalDue > 0 ? ' bad' : ''}`}>{inr(ledger.totalDue)}</div>
-        </button>
-        <button className="stat" onClick={() => go('stock')}>
-          <div className="k">
-            <AlertTriangle size={13} /> {t.lowStock}
-          </div>
-          <div className={`v num${ledger.lowCount ? ' bad' : ' good'}`}>{ledger.lowCount}</div>
-        </button>
-      </div>
-
-      <section className="section a-brief">
-        <div className="card">
-          <div className="brief">
-            <button className={`play${speaker.speaking ? ' on' : ''}`} onClick={playBriefing} aria-label={speaker.speaking ? t.stop : t.play} disabled={loadingBrief}>
-              {speaker.speaking ? <Pause size={20} /> : <Play size={20} style={{ marginLeft: 2 }} />}
-            </button>
-            <div className="txt">
-              <b>
-                {t.morning}
-                {speaker.speaking && (
-                  <span className="wave" aria-hidden>
-                    <i />
-                    <i />
-                    <i />
-                    <i />
-                  </span>
-                )}
-              </b>
-              <span>{loadingBrief ? 'Gemini is preparing your summary…' : 'Yesterday, stock running out, udhaar due. 30 seconds.'}</span>
+        <section className="a-ask">
+          <div className="ask-card">
+            <div className="ask-head">
+              <span className="ask-orb">
+                <Sparkles size={18} />
+              </span>
+              <div>
+                <b>{t.askTitle}</b>
+                <span>Your shop’s AI assistant, powered by Gemini</span>
+              </div>
+            </div>
+            <div className="ask-input">
+              <button className="ask-field" onClick={() => openAsk()}>
+                {t.askPlaceholder}
+              </button>
+              <button className="ask-mic" onClick={() => openAsk(true)} aria-label="Ask by voice">
+                <Mic size={19} />
+              </button>
+            </div>
+            <div className="ask-suggest">
+              {SUGGESTED.map((q) => (
+                <button key={q} onClick={() => openAsk(false, q)}>
+                  <span>{q}</span>
+                  <ArrowRight size={14} />
+                </button>
+              ))}
             </div>
           </div>
-          {script && <p className="brief-script" style={{ margin: 0 }}>{script}</p>}
-        </div>
-      </section>
+        </section>
 
-      <section className="section a-chart">
-        <div className="section-head">
-          <h2>{t.last7}</h2>
-          <span className="aside-txt num">{inr(ledger.days.reduce((s, d) => s + d.sales, 0))}</span>
-        </div>
-        <div className="card">
-          <div className="bars" role="img" aria-label={`Sales for the last 7 days: ${ledger.days.map((d) => `${d.label} ${inr(d.sales)}`).join(', ')}`}>
+        <section className="a-attn panel">
+          <div className="block-head">
+            <h2>Needs attention</h2>
+            <span>{low.length + overdue.length ? `${low.length + overdue.length} to act on` : 'All clear'}</span>
+          </div>
+          <ul className="attn">
+            {low.length > 0 && (
+              <li>
+                <span className="attn-ic warn">
+                  <Package size={18} />
+                </span>
+                <div className="attn-main">
+                  <b>
+                    {low
+                      .slice(0, 2)
+                      .map((s) => s.name)
+                      .join(' and ')}
+                    {low.length > 2 ? ` +${low.length - 2} more` : ''} running low
+                  </b>
+                  <span>About {Math.max(Math.round(Math.min(...low.map((s) => (Number.isFinite(s.daysLeft) ? s.daysLeft : 0)))), 0)} days of stock left</span>
+                </div>
+                <button className="attn-act" onClick={() => openAsk(false, 'Make a supplier order for the items running low')}>
+                  Order
+                </button>
+              </li>
+            )}
+            {overdue.slice(0, 2).map((c) => (
+              <li key={c.key}>
+                <span className="attn-ic bad">
+                  <Wallet size={18} />
+                </span>
+                <div className="attn-main">
+                  <b>
+                    {c.name} hasn’t paid in {Math.min(daysSince(c.lastPaymentTs || c.history[c.history.length - 1]?.ts || 0), 999)} days
+                  </b>
+                  <span className="num">{inr(c.due)} udhaar due</span>
+                </div>
+                <button className="attn-act" onClick={() => openAsk(false, `Send ${c.name} a WhatsApp reminder for their udhaar`)}>
+                  Remind
+                </button>
+              </li>
+            ))}
+            <li>
+              <span className="attn-ic brand">
+                <BellRing size={18} />
+              </span>
+              <div className="attn-main">
+                <b>
+                  {t.morning}
+                  {speaker.speaking && (
+                    <span className="wave" aria-hidden>
+                      <i />
+                      <i />
+                      <i />
+                      <i />
+                    </span>
+                  )}
+                </b>
+                <span>{loadingBrief ? 'Gemini is preparing your summary…' : 'A 30-second spoken summary of your shop'}</span>
+              </div>
+              <button className="attn-act icon" onClick={playBriefing} disabled={loadingBrief} aria-label={speaker.speaking ? t.stop : t.play}>
+                {speaker.speaking ? <Pause size={16} /> : <Play size={16} />}
+              </button>
+            </li>
+          </ul>
+          {script && <p className="brief-script">{script}</p>}
+        </section>
+
+        <section className="a-chart panel">
+          <div className="block-head">
+            <h2>Sales, last 7 days</h2>
+            <span className="num">{inr(weekSales)}</span>
+          </div>
+          <div className="chart-sel num" aria-live="polite">
+            <b>{inr(day.sales)}</b>
+            <span>
+              {sel === ledger.days.length - 1 ? 'Today so far' : new Date(day.day).toLocaleDateString('en-IN', { weekday: 'long' })} · {inr(day.profit)} profit
+            </span>
+          </div>
+          <div className="bars" role="group" aria-label="Daily sales">
             {ledger.days.map((d, i) => {
               const isToday = i === ledger.days.length - 1;
-              const isMax = d.sales === max && !isToday;
               return (
-                <div className="bar-col" key={d.day}>
+                <button className={`bar-col${i === sel ? ' sel' : ''}`} key={d.day} onClick={() => setSel(i)} aria-label={`${d.label}: ${inr(d.sales)}`} aria-pressed={i === sel}>
                   <div className="bar-track">
-                    {(isToday || isMax) && <span className="bar-val num">{d.sales >= 1000 ? `${(d.sales / 1000).toFixed(1)}k` : Math.round(d.sales)}</span>}
-                    <div className={`bar${isToday ? ' today' : ''}`} style={{ height: `${Math.max((d.sales / max) * 82, 2)}%`, animationDelay: `${i * 40}ms` }} />
+                    <div className={`bar${isToday ? ' today' : ''}`} style={{ height: `${Math.max((d.sales / max) * 100, 2)}%`, animationDelay: `${i * 40}ms` }} />
                   </div>
-                  <span className={`bar-lbl${isToday ? ' today' : ''}`}>{isToday ? 'Today' : d.label}</span>
-                </div>
+                  <span className="bar-lbl">{isToday ? 'Today' : d.label}</span>
+                </button>
               );
             })}
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="section a-recent">
-        <div className="section-head">
-          <h2>{t.recent}</h2>
-        </div>
-        <div className="card">
+        <section className="a-recent panel">
+          <div className="block-head">
+            <h2>{t.recent}</h2>
+            <button className="link" onClick={openAdd}>
+              + {t.add}
+            </button>
+          </div>
           {recent.length === 0 ? (
             <div className="empty">
               <div className="ic">
@@ -196,39 +274,37 @@ export function Home({ go, openAdd, openAsk, openSettings }: { go: (t: Tab) => v
               </div>
               <b>{t.noEntries}</b>
               {t.noEntriesHint}
-              <div style={{ marginTop: 14 }}>
-                <button className="btn primary" onClick={openAdd}>
-                  {t.add}
-                </button>
-              </div>
             </div>
           ) : (
-            <ul className="rows">
-              {recent.map((e) => (
-                <li key={e.id}>
-                  <button className="row" onClick={() => setEntry(e)}>
-                    <KindIcon kind={kindOf(e)} />
-                    <div className="main">
-                      <div className="t">{entryTitle(e)}</div>
-                      <div className="s">
-                        {relTime(e.ts)}
-                        {e.type === 'sale' && e.credit ? ` · udhaar · ${e.customer}` : e.supplier ? ` · ${e.supplier}` : ''}
-                        {e.source === 'voice' ? ' · 🎙' : e.source === 'bill' ? ' · bill' : e.source === 'agent' ? ' · Ask Dukaan' : ''}
-                      </div>
-                    </div>
-                    <div>
-                      <div className={`amt num ${moneyClass(e)}`}>{moneyText(e)}</div>
-                      {e.type === 'sale' && ledger.saleProfit[e.id] != null && <div className="amt-sub num">{inr(ledger.saleProfit[e.id])} profit</div>}
-                    </div>
-                  </button>
-                </li>
-              ))}
-            </ul>
+            groups.map((g) => (
+              <div key={g.label} className="group">
+                <div className="group-label">{g.label}</div>
+                <ul className="rows">
+                  {g.items.map((e) => (
+                    <li key={e.id}>
+                      <button className="row" onClick={() => setEntry(e)}>
+                        <KindIcon kind={kindOf(e)} />
+                        <div className="main">
+                          <div className="t">{entryTitle(e)}</div>
+                          <div className="s">
+                            {relTime(e.ts)}
+                            {e.type === 'sale' && e.credit ? ` · udhaar · ${e.customer}` : e.supplier ? ` · ${e.supplier}` : ''}
+                            {e.source === 'voice' ? ' · voice' : e.source === 'bill' ? ' · bill scan' : e.source === 'agent' ? ' · Ask Dukaan' : ''}
+                          </div>
+                        </div>
+                        <div>
+                          <div className={`amt num ${moneyClass(e)}`}>{moneyText(e)}</div>
+                          {e.type === 'sale' && ledger.saleProfit[e.id] != null && <div className="amt-sub num">{inr(ledger.saleProfit[e.id])} profit</div>}
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))
           )}
-        </div>
-      </section>
-
-     </div>
+        </section>
+      </div>
       {entry && <EntrySheet entry={entry} onClose={() => setEntry(null)} />}
     </div>
   );

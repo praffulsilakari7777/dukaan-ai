@@ -30,8 +30,12 @@ export default function App() {
   const wide = useWide();
   const [tab, setTab] = useState<Tab>('home');
   const [overlay, setOverlay] = useState<Overlay>(null);
+  const [askQ, setAskQ] = useState<string | undefined>();
   const [ai, setAi] = useState<boolean | null>(null);
-  const close = () => setOverlay(null);
+  const close = () => {
+    setOverlay(null);
+    setAskQ(undefined);
+  };
 
   useEffect(() => {
     health().then((h) => setAi(h.gemini));
@@ -115,7 +119,7 @@ export default function App() {
               <h1>{tab === 'home' ? `${greet}, ${settings.ownerName}` : titles[tab]}</h1>
               <span>{now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
             </div>
-            <button className="tb-ask" onClick={() => setOverlay('ask')}>
+            <button className="tb-ask" onClick={() => setOverlay('ask')} style={tab === 'home' ? { visibility: 'hidden' } : undefined}>
               <Sparkles size={18} />
               <span>{t.askPlaceholder}</span>
               <kbd>/</kbd>
@@ -126,7 +130,7 @@ export default function App() {
           </header>
         )}
 
-        {tab === 'home' && <Home go={setTab} openAdd={() => setOverlay('add')} openAsk={(v) => setOverlay(v ? 'ask-voice' : 'ask')} openSettings={() => setOverlay('settings')} />}
+        {tab === 'home' && <Home go={setTab} openAdd={() => setOverlay('add')} openAsk={(v, q) => { setAskQ(q); setOverlay(v ? 'ask-voice' : 'ask'); }} openSettings={() => setOverlay('settings')} />}
         {tab === 'stock' && <Stock openAdd={() => setOverlay('add')} />}
         {tab === 'khata' && <Khata />}
         {tab === 'insights' && <Insights />}
@@ -145,7 +149,7 @@ export default function App() {
       </nav>
 
       {overlay === 'add' && <AddSheet onClose={close} />}
-      {(overlay === 'ask' || overlay === 'ask-voice') && <AskSheet onClose={close} startVoice={overlay === 'ask-voice'} />}
+      {(overlay === 'ask' || overlay === 'ask-voice') && <AskSheet onClose={close} startVoice={overlay === 'ask-voice'} initial={askQ} />}
       {overlay === 'settings' && <SettingsSheet onClose={close} />}
 
       {toastMsg && (
