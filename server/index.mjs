@@ -284,6 +284,21 @@ No logos, no QR codes, no phone numbers, no extra words.`;
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.ico': 'image/x-icon', '.json': 'application/json', '.webmanifest': 'application/manifest+json', '.mp4': 'video/mp4' };
 
+// Per-visitor limits so a public link can't run up the Vertex AI bill.
+const LIMITS = { '/api/offer-image': [12, 3600_000], default: [120, 600_000] };
+const hits = new Map();
+function limited(req, path) {
+  const ip = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || 'unknown';
+  const [max, windowMs] = LIMITS[path] || LIMITS.default;
+  const key = `${ip}|${LIMITS[path] ? path : '*'}`;
+  const now = Date.now();
+  const recent = (hits.get(key) || []).filter((t) => now - t < windowMs);
+  recent.push(now);
+  hits.set(key, recent);
+  if (hits.size > 5000) for (const [k, v] of hits) if (!v.some((t) => now - t < 3600_000)) hits.delete(k);
+  return recent.length > max;
+}
+
 function send(res, status, body) {
   res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
   res.end(JSON.stringify(body));
@@ -309,6 +324,8 @@ createServer(async (req, res) => {
     if (req.url.startsWith('/api/')) return send(res, 404, { error: 'not found' });
     return serveStatic(req, res);
   }
+  const path = req.url.split('?')[0];
+  if (req.method === 'POST' && limited(req, path)) return send(res, 429, { error: 'Too many requests. Please wait a few minutes.' });
   try {
     let body = {};
     if (req.method === 'POST') {
