@@ -1,7 +1,16 @@
 // Gemini access with no SDK: either an AI Studio API key, or Vertex AI with a
 // service account (a key file via GOOGLE_APPLICATION_CREDENTIALS, or the Cloud Run identity).
 import { createSign } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+
+// Local secrets live in server/.env (git-ignored). Real environment variables win.
+const ENV_FILE = new URL('./.env', import.meta.url);
+if (existsSync(ENV_FILE)) {
+  for (const line of readFileSync(ENV_FILE, 'utf8').split('\n')) {
+    const m = line.match(/^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*?)\s*$/);
+    if (m && m[2] && !(m[1] in process.env)) process.env[m[1]] = m[2].replace(/^["']|["']$/g, '');
+  }
+}
 
 const MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 const API_KEY = process.env.GEMINI_API_KEY || '';
