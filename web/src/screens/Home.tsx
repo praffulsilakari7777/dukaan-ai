@@ -1,4 +1,4 @@
-import { ArrowRight, BellRing, CalendarClock, ChevronRight, Languages, Mic, Package, Pause, Play, Settings as Cog, Sparkles, Wallet } from 'lucide-react';
+import { ArrowRight, BellRing, CalendarClock, FlaskConical, MessageCircle, ChevronRight, Languages, Mic, Package, Pause, Play, Settings as Cog, Sparkles, Wallet } from 'lucide-react';
 import { useState } from 'react';
 import { briefing, OfflineError } from '../lib/api';
 import { daysSince, fmtQty, inr, relTime, startOfDay } from '../lib/ledger';
@@ -38,9 +38,10 @@ function offlineBriefing(s: ReturnType<typeof briefingSummary>, lang: string) {
 
 type OpenAsk = (voice?: boolean, q?: string) => void;
 
-export function Home({ go, openAdd, openAsk, openSettings, openLang }: { go: (t: Tab) => void; openAdd: () => void; openAsk: OpenAsk; openSettings: () => void; openLang: () => void }) {
+export function Home({ go, openAdd, openAsk, openSettings, openLang, openTour }: { go: (t: Tab) => void; openAdd: () => void; openAsk: OpenAsk; openSettings: () => void; openLang: () => void; openTour: () => void }) {
   const store = useStore();
-  const { ledger, t, settings, entries } = store;
+  const { ledger, t, settings, entries, reset } = store;
+  const isDemo = entries.some((e) => e.source === 'demo');
   const SUGGESTED = [t.sugg1, t.sugg2, t.sugg3];
   const [entry, setEntry] = useState<Entry | null>(null);
   const [script, setScript] = useState<string | null>(null);
@@ -90,6 +91,24 @@ export function Home({ go, openAdd, openAsk, openSettings, openLang }: { go: (t:
 
   return (
     <div className="screen">
+      {isDemo && (
+        <div className="demo-wrap">
+          <div className="demo-banner" role="note">
+            <FlaskConical size={17} />
+            <span>{t.demoBanner}</span>
+            <div className="db-act">
+              <button onClick={openTour}>{t.takeTour}</button>
+              <button
+                onClick={() => {
+                  if (window.confirm(t.startOwnConfirm)) reset();
+                }}
+              >
+                {t.startOwn}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="home">
         <header className="m-head only-narrow">
           <div>
@@ -158,6 +177,13 @@ export function Home({ go, openAdd, openAsk, openSettings, openLang }: { go: (t:
                 <Mic size={19} />
               </button>
             </div>
+            <button className="wa-try" onClick={() => go('whatsapp')}>
+              <MessageCircle size={16} />
+              <span>
+                <b>{t.waTry}</b> · {t.waTrySub}
+              </span>
+              <ArrowRight size={14} />
+            </button>
             <div className="ask-suggest">
               {SUGGESTED.map((q) => (
                 <button key={q} onClick={() => openAsk(false, q)}>

@@ -1,5 +1,5 @@
 export type EntryType = 'sale' | 'purchase' | 'payment' | 'expense';
-export type EntrySource = 'voice' | 'text' | 'bill' | 'agent' | 'demo' | 'manual';
+export type EntrySource = 'voice' | 'text' | 'bill' | 'agent' | 'demo' | 'manual' | 'whatsapp';
 
 export interface Entry {
   id: string;

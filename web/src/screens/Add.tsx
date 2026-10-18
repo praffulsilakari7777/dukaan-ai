@@ -1,5 +1,5 @@
 import { Camera, Check, FileImage, ImageUp, Keyboard, Loader2, Mic, ScanLine, Send, Sparkles } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { DraftCards, Sheet } from '../components/ui';
 import { OfflineError, parseText, resizeImage, scanBill } from '../lib/api';
 import { inr } from '../lib/ledger';
@@ -36,6 +36,17 @@ export function AddSheet({ onClose }: { onClose: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const camRef = useRef<HTMLInputElement>(null);
 
+  // A scan is one Gemini call; these are its real stages, paced to its usual ~10s.
+  const [scanStart, setScanStart] = useState(0);
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (!scanStart) return;
+    const id = window.setInterval(() => tick((n) => n + 1), 400);
+    return () => window.clearInterval(id);
+  }, [scanStart]);
+  const scanElapsed = scanStart ? (Date.now() - scanStart) / 1000 : 0;
+  const scanStage = scanElapsed < 1.2 ? 0 : scanElapsed < 7 ? 1 : scanElapsed < 10 ? 2 : 3;
+
   const voice = useVoice(settings.voiceLang, (spoken) => understand(spoken, 'voice'));
 
   async function understand(input: string, src: EntrySource) {
@@ -71,6 +82,7 @@ export function AddSheet({ onClose }: { onClose: () => void }) {
   async function scan() {
     if (!photo) return;
     setBusy(true);
+    setScanStart(Date.now());
     setError(null);
     try {
       const r = await scanBill(photo, ledger.stock.map((s) => s.name));
@@ -90,6 +102,7 @@ export function AddSheet({ onClose }: { onClose: () => void }) {
       } else setError(e instanceof OfflineError ? 'Bill scanning needs the internet and Gemini. Check your connection and try again.' : 'Could not scan this bill. Please try again.');
     } finally {
       setBusy(false);
+      setScanStart(0);
     }
   }
 
@@ -241,6 +254,19 @@ export function AddSheet({ onClose }: { onClose: () => void }) {
                 {busy && <div className="scanline" />}
               </div>
               {error && <div className="err">{error}</div>}
+              {busy && scanStart > 0 && (
+                <ol className="scan-steps" aria-live="polite">
+                  {[t.scanStep1, t.scanStep2, t.scanStep3, t.scanStep4].map((label, i) => (
+                    <li key={label} className={i < scanStage ? 'done' : i === scanStage ? 'now' : ''}>
+                      <span className="dot">{i < scanStage ? <Check size={12} strokeWidth={3} /> : i === scanStage ? <Loader2 size={12} className="spin" /> : null}</span>
+                      {label}
+                    </li>
+                  ))}
+                  <div className="scan-bar" aria-hidden>
+                    <i style={{ width: `${Math.min(8 + scanElapsed * 8.5, 94)}%` }} />
+                  </div>
+                </ol>
+              )}
               <div className="row-inline" style={{ marginTop: 12 }}>
                 <button className="btn ghost" onClick={() => setPhoto(null)} disabled={busy}>
                   {t.retake}

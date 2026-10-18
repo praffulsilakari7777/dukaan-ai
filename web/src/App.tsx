@@ -1,9 +1,11 @@
-import { BookUser, CheckCircle2, Home as HomeIcon, Landmark, Languages, Lightbulb, Package, Plus, Settings as Cog, Sparkles, Tag } from 'lucide-react';
+import { BookUser, CheckCircle2, Home as HomeIcon, Landmark, Languages, Lightbulb, MessageCircle, Package, Plus, Settings as Cog, Sparkles, Tag } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { health } from './lib/api';
 import { useStore } from './lib/store';
 import { langInfo } from './lib/i18n';
 import { LanguagePicker } from './components/LanguagePicker';
+import { Tour, tourSeen } from './components/Tour';
+import { WhatsAppBot } from './screens/WhatsApp';
 import { useWide } from './lib/useWide';
 import { AddSheet } from './screens/Add';
 import { AskSheet } from './screens/Ask';
@@ -16,7 +18,7 @@ import { offerCandidates } from './lib/offers';
 import { SettingsSheet } from './screens/Settings';
 import { Stock } from './screens/Stock';
 
-export type Tab = 'home' | 'stock' | 'khata' | 'insights' | 'offers' | 'loans';
+export type Tab = 'home' | 'stock' | 'khata' | 'insights' | 'offers' | 'loans' | 'whatsapp';
 type Overlay = null | 'add' | 'ask' | 'ask-voice' | 'settings' | 'lang';
 
 export function Logo({ size = 34 }: { size?: number }) {
@@ -36,6 +38,7 @@ export default function App() {
   const [tab, setTab] = useState<Tab>('home');
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [askQ, setAskQ] = useState<string | undefined>();
+  const [tour, setTour] = useState(() => !tourSeen());
   const [ai, setAi] = useState<boolean | null>(null);
   const close = () => {
     setOverlay(null);
@@ -63,11 +66,11 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [overlay]);
 
-  const titles: Record<Tab, string> = { home: t.home, stock: t.stock, khata: t.khata, insights: t.insights, offers: t.offers, loans: t.loans };
-  const icons = { home: HomeIcon, stock: Package, khata: BookUser, insights: Lightbulb, offers: Tag, loans: Landmark };
+  const titles: Record<Tab, string> = { home: t.home, stock: t.stock, khata: t.khata, insights: t.insights, offers: t.offers, loans: t.loans, whatsapp: t.waNav };
+  const icons = { home: HomeIcon, stock: Package, khata: BookUser, insights: Lightbulb, offers: Tag, loans: Landmark, whatsapp: MessageCircle };
   const badges: Partial<Record<Tab, number>> = { stock: ledger.lowCount, khata: ledger.customers.filter((c) => c.due > 0).length, offers: offerCandidates(ledger).length };
   // On phones, Offers lives under Stock and Loans under Insights.
-  const parent: Partial<Record<Tab, Tab>> = { offers: 'stock', loans: 'insights' };
+  const parent: Partial<Record<Tab, Tab>> = { offers: 'stock', loans: 'insights', whatsapp: 'home' };
 
   const navItem = (id: Tab) => {
     const Icon = icons[id];
@@ -103,7 +106,7 @@ export default function App() {
         <nav className="side-nav" aria-label="Main">
           {(['home', 'stock', 'khata', 'insights'] as Tab[]).map(navItem)}
           <span className="side-group">{t.grow}</span>
-          {(['offers', 'loans'] as Tab[]).map(navItem)}
+          {(['offers', 'loans', 'whatsapp'] as Tab[]).map(navItem)}
         </nav>
         <div className="side-foot">
           <div className="shop-card">
@@ -139,12 +142,13 @@ export default function App() {
           </header>
         )}
 
-        {tab === 'home' && <Home go={setTab} openAdd={() => setOverlay('add')} openAsk={(v, q) => { setAskQ(q); setOverlay(v ? 'ask-voice' : 'ask'); }} openSettings={() => setOverlay('settings')} openLang={() => setOverlay('lang')} />}
+        {tab === 'home' && <Home go={setTab} openAdd={() => setOverlay('add')} openAsk={(v, q) => { setAskQ(q); setOverlay(v ? 'ask-voice' : 'ask'); }} openSettings={() => setOverlay('settings')} openLang={() => setOverlay('lang')} openTour={() => setTour(true)} />}
         {tab === 'stock' && <Stock openAdd={() => setOverlay('add')} go={setTab} />}
         {tab === 'khata' && <Khata />}
         {tab === 'insights' && <Insights go={setTab} />}
         {tab === 'offers' && <Offers back={() => setTab('stock')} />}
         {tab === 'loans' && <Loans back={() => setTab('insights')} />}
+        {tab === 'whatsapp' && <WhatsAppBot back={() => setTab('home')} />}
       </main>
 
       <nav className="nav" aria-label="Main">
@@ -163,6 +167,7 @@ export default function App() {
       {(overlay === 'ask' || overlay === 'ask-voice') && <AskSheet onClose={close} startVoice={overlay === 'ask-voice'} initial={askQ} />}
       {overlay === 'settings' && <SettingsSheet onClose={close} />}
       {overlay === 'lang' && <LanguagePicker onClose={close} />}
+      {tour && !overlay && <Tour onClose={() => setTour(false)} />}
 
       {toastMsg && (
         <div className="toast" role="status">

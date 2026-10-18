@@ -1,4 +1,4 @@
-import { canonicalItem, canonicalUnit, uid } from './ledger';
+import { canonicalItem, canonicalUnit, titleCase, uid } from './ledger';
 import { offlineParse } from './parser';
 import type { Draft, EntryType } from './types';
 
@@ -86,7 +86,8 @@ export async function scanBill(dataUrl: string, items: string[] = []) {
   const [meta, image] = dataUrl.split(',');
   const mime = meta.match(/data:(.*?);/)?.[1] ?? 'image/jpeg';
   const r = await post<{ supplier?: string; entries: RawEntry[] }>('scan', { image, mime, items }, 45_000);
-  return { supplier: r.supplier, drafts: toDrafts(r.entries.map((e) => ({ ...e, type: 'purchase' as const, supplier: r.supplier }))) };
+  const supplier = r.supplier && r.supplier === r.supplier.toUpperCase() ? titleCase(r.supplier) : r.supplier;
+  return { supplier, drafts: toDrafts(r.entries.map((e) => ({ ...e, type: 'purchase' as const, supplier }))) };
 }
 
 export interface InsightResult {
