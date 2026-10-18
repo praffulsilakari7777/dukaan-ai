@@ -11,6 +11,7 @@ type Recognition = {
   onend: (() => void) | null;
   start: () => void;
   stop: () => void;
+  abort?: () => void;
 };
 
 const SR: (new () => Recognition) | undefined =
@@ -18,13 +19,18 @@ const SR: (new () => Recognition) | undefined =
 
 export const speechSupported = !!SR;
 
-/** Google speech recognition through the browser. Calls onFinal with the full transcript when the owner stops. */
+/**
+ * Google speech recognition through the browser. Calls onFinal with what was said when the
+ * owner stops or pauses. Chrome often ends a session before marking the last words final,
+ * so the latest interim text counts too; otherwise a tap on "stop" would lose the sentence.
+ */
 export function useVoice(lang: string, onFinal: (text: string) => void) {
   const [listening, setListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [error, setError] = useState<string | null>(null);
   const rec = useRef<Recognition | null>(null);
-  const finalText = useRef('');
+  const heard = useRef('');
+  const failed = useRef(false);
   const cb = useRef(onFinal);
   cb.current = onFinal;
 
@@ -32,42 +38,48 @@ export function useVoice(lang: string, onFinal: (text: string) => void) {
 
   const start = useCallback(() => {
     if (!SR) {
-      setError('Voice needs Chrome on Android or desktop. You can type instead.');
+      setError('Voice needs Chrome on Android or a computer. You can type instead.');
       return;
     }
+    rec.current?.abort?.();
     setError(null);
     setTranscript('');
-    finalText.current = '';
+    heard.current = '';
+    failed.current = false;
     const r = new SR();
     r.lang = lang;
     r.interimResults = true;
     r.continuous = false;
     r.onresult = (e) => {
-      let interim = '';
-      let fin = '';
-      for (let i = 0; i < e.results.length; i++) {
-        const t = e.results[i][0].transcript;
-        if (e.results[i].isFinal) fin += t;
-        else interim += t;
-      }
-      finalText.current = fin;
-      setTranscript((fin + ' ' + interim).trim());
+      let text = '';
+      for (let i = 0; i < e.results.length; i++) text += e.results[i][0].transcript;
+      heard.current = text.replace(/\s+/g, ' ').trim();
+      setTranscript(heard.current);
     };
     r.onerror = (e) => {
-      if (e.error === 'not-allowed') setError('Microphone permission is blocked. Allow it in the browser, or type instead.');
-      else if (e.error !== 'no-speech' && e.error !== 'aborted') setError('Could not hear that. Try again, or type it.');
+      failed.current = true;
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') setError('Microphone access is blocked. Allow it in the browser settings, or type instead.');
+      else if (e.error === 'no-speech') setError("Didn't hear anything. Tap the mic and speak, then tap again to send.");
+      else if (e.error === 'network') setError('Voice needs an internet connection. You can type instead.');
+      else if (e.error !== 'aborted') setError('Could not hear that clearly. Try again, or type it.');
     };
     r.onend = () => {
       setListening(false);
-      const text = finalText.current.trim();
+      if (rec.current === r) rec.current = null;
+      const text = heard.current;
       if (text) cb.current(text);
+      else if (!failed.current) setError("Didn't catch that. Tap the mic, speak, then tap again to send.");
     };
     rec.current = r;
-    r.start();
-    setListening(true);
+    try {
+      r.start();
+      setListening(true);
+    } catch {
+      setError('Could not start the microphone. Please try again.');
+    }
   }, [lang]);
 
-  useEffect(() => () => rec.current?.stop(), []);
+  useEffect(() => () => rec.current?.abort?.(), []);
 
   return { listening, transcript, error, start, stop, toggle: () => (listening ? stop() : start()) };
 }
