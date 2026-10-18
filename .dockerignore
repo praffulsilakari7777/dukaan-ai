@@ -3,3 +3,7 @@ web/dist
 .git
 video
 *.mp4
+
+**/.env
+**/service-account*.json
+**/*-sa.json

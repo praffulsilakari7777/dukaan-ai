@@ -14,8 +14,12 @@ if (existsSync(ENV_FILE)) {
 
 const MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 const API_KEY = process.env.GEMINI_API_KEY || '';
+// Vertex AI express-mode API key: Vertex endpoints, no service account needed.
+const VERTEX_KEY = process.env.VERTEX_API_KEY || '';
 const LOCATION = process.env.VERTEX_LOCATION || 'us-central1';
-const SA_PATH = process.env.GOOGLE_APPLICATION_CREDENTIALS || '';
+const SA_RAW = process.env.GOOGLE_APPLICATION_CREDENTIALS || '';
+// A relative path in .env means relative to the server folder.
+const SA_PATH = SA_RAW && !SA_RAW.startsWith('/') ? new URL(SA_RAW, import.meta.url).pathname : SA_RAW;
 const ON_CLOUD_RUN = !!process.env.K_SERVICE;
 
 let sa = null;
@@ -28,7 +32,7 @@ if (SA_PATH) {
 }
 const PROJECT = process.env.GOOGLE_CLOUD_PROJECT || sa?.project_id || '';
 
-export const mode = API_KEY ? 'api-key' : sa || (ON_CLOUD_RUN && PROJECT) || process.env.USE_VERTEX ? 'vertex' : 'none';
+export const mode = API_KEY ? 'api-key' : VERTEX_KEY ? 'vertex-key' : sa || (ON_CLOUD_RUN && PROJECT) || process.env.USE_VERTEX ? 'vertex' : 'none';
 export const model = MODEL;
 
 let cached = { token: '', exp: 0 };
@@ -65,6 +69,9 @@ export async function generate(body, { timeoutMs = 40_000, model: useModel = MOD
   if (mode === 'api-key') {
     url = `https://generativelanguage.googleapis.com/v1beta/models/${useModel}:generateContent`;
     headers['x-goog-api-key'] = API_KEY;
+  } else if (mode === 'vertex-key') {
+    url = `https://aiplatform.googleapis.com/v1/publishers/google/models/${useModel}:generateContent`;
+    headers['x-goog-api-key'] = VERTEX_KEY;
   } else {
     const host = LOCATION === 'global' ? 'aiplatform.googleapis.com' : `${LOCATION}-aiplatform.googleapis.com`;
     url = `https://${host}/v1/projects/${PROJECT}/locations/${LOCATION}/publishers/google/models/${useModel}:generateContent`;
