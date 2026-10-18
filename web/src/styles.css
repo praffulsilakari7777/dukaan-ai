@@ -958,3 +958,6 @@ a.btn { text-decoration: none; }
 .scan-steps li.now .dot { background: var(--brand-50); color: var(--brand); }
 .scan-bar { height: 4px; border-radius: 2px; background: var(--line-2); overflow: hidden; margin-top: 4px; }
 .scan-bar i { display: block; height: 100%; background: var(--brand); border-radius: 2px; transition: width 0.8s var(--ease); }
+.wa-msg.bot:has(.wa-quick), .wa-msg.bot:has(.wa-state) { padding-bottom: 8px; }
+.wa-msg.bot:has(.wa-quick) .wa-meta, .wa-msg.bot:has(.wa-state) .wa-meta { position: static; display: flex; justify-content: flex-end; margin-top: 2px; }
+.wa-quick { margin: 6px -4px -4px; }
