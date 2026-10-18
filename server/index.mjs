@@ -212,10 +212,14 @@ Return:
   },
 
   async 'POST /api/offer'(b) {
-    return generateJSON({
+    const c = b.candidate || {};
+    // Hard floor: never below cost unless the stock is about to spoil.
+    const days = c.daysToExpiry ?? 99;
+    const floor = c.cost ? Math.ceil(c.cost * (days <= 1 ? 0.6 : days <= 2 ? 0.8 : 1)) : 0;
+    const plan = await generateJSON({
       system: `You are a retail merchandising expert for Indian kirana shops. You design one offer to clear at-risk stock while protecting the shop's money.
 Rules: expiring stock should be cleared before the date, so price it to sell in time; only go below cost if it expires within 2 days, and say so. For slow, non-perishable stock prefer a combo with a fast-selling item over a deep discount. Round prices to whole rupees. Write the headline, tagline and reasoning in ${langName(b.lang)}. Write the WhatsApp message in ${b.lang === 'en' ? 'friendly Hinglish (Roman script) that customers in a small Indian town read easily' : langName(b.lang)}.`,
-      parts: [{ text: `Shop: ${b.shop}\nAt-risk item (JSON): ${JSON.stringify(b.candidate)}\nFast-selling items to pair with: ${(b.fast_movers || []).join(', ') || 'none'}\nDesign the offer.` }],
+      parts: [{ text: `Shop: ${b.shop}\nAt-risk item (JSON): ${JSON.stringify(b.candidate)}\nFast-selling items to pair with: ${(b.fast_movers || []).join(', ') || 'none'}\nThe offer price must be at least ₹${floor} per unit.\nDesign the offer.` }],
       schema: {
         type: 'OBJECT',
         properties: {
@@ -233,6 +237,15 @@ Rules: expiring stock should be cleared before the date, so price it to sell in 
       },
       temperature: 0.7,
     });
+    if (floor && plan.offer_price < floor) {
+      const oldPrice = plan.offer_price;
+      const oldPct = plan.discount_pct;
+      plan.offer_price = floor;
+      plan.discount_pct = c.price ? Math.max(Math.round(((c.price - floor) / c.price) * 100), 0) : plan.discount_pct;
+      const fix = (t) => t && t.replaceAll(`₹${oldPrice}`, `₹${floor}`).replaceAll(`${oldPct}%`, `${plan.discount_pct}%`);
+      for (const k of ['headline', 'whatsapp_message', 'poster_tagline', 'reasoning']) plan[k] = fix(plan[k]);
+    }
+    return plan;
   },
 
   async 'POST /api/offer-image'(b) {
