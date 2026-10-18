@@ -2,6 +2,8 @@
 
 **An AI employee for India's kirana stores: it listens, keeps the books, and helps them get credit.**
 
+**Live app:** https://dukaan-ai-633400982.asia-south1.run.app (Cloud Run, Gemini on Vertex AI). Works on any phone or laptop in Chrome; open Settings to switch between 12 languages.
+
 A shop owner speaks a sale in Hinglish ("Ramesh ne 2 kg dal udhaar liya 240") or photographs a supplier bill. Gemini turns it into ledger entries, the owner confirms, and stock, khata (udhaar), profit and a loan-readiness **Dukaan Score** update on their own. **Ask Dukaan** is a Gemini function-calling agent that answers questions about the shop and drafts WhatsApp reminders, supplier orders and offers.
 
 Built for the Google Cloud AI Builder Cup 2026, Theme 2 (Retail & Commerce), with a link to Theme 1 (BFSI) through the Dukaan Score.
