@@ -62,34 +62,54 @@ async function accessToken() {
 
 export const imageModel = process.env.GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image';
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const BUSY = new Set([429, 500, 503]);
+
+function endpoint(useModel, location) {
+  if (mode === 'api-key') return `https://generativelanguage.googleapis.com/v1beta/models/${useModel}:generateContent`;
+  if (mode === 'vertex-key') return `https://aiplatform.googleapis.com/v1/publishers/google/models/${useModel}:generateContent`;
+  const host = location === 'global' ? 'aiplatform.googleapis.com' : `${location}-aiplatform.googleapis.com`;
+  return `https://${host}/v1/projects/${PROJECT}/locations/${location}/publishers/google/models/${useModel}:generateContent`;
+}
+
+/**
+ * One Gemini call. Quota errors (429) are common on shared Vertex capacity, so retry with
+ * backoff and fail over from the regional endpoint to the global one. If Gemini stays busy,
+ * answer 503 so the app switches to its offline fallbacks instead of showing an error.
+ */
 export async function generate(body, { timeoutMs = 40_000, model: useModel = MODEL } = {}) {
   if (mode === 'none') throw Object.assign(new Error('Gemini is not configured'), { status: 503 });
-  let url;
-  const headers = { 'Content-Type': 'application/json' };
-  if (mode === 'api-key') {
-    url = `https://generativelanguage.googleapis.com/v1beta/models/${useModel}:generateContent`;
-    headers['x-goog-api-key'] = API_KEY;
-  } else if (mode === 'vertex-key') {
-    url = `https://aiplatform.googleapis.com/v1/publishers/google/models/${useModel}:generateContent`;
-    headers['x-goog-api-key'] = VERTEX_KEY;
-  } else {
-    const host = LOCATION === 'global' ? 'aiplatform.googleapis.com' : `${LOCATION}-aiplatform.googleapis.com`;
-    url = `https://${host}/v1/projects/${PROJECT}/locations/${LOCATION}/publishers/google/models/${useModel}:generateContent`;
-    headers.Authorization = `Bearer ${await accessToken()}`;
+  const locations = mode === 'vertex' && LOCATION !== 'global' ? ['global', LOCATION, 'global', LOCATION] : [LOCATION, LOCATION, LOCATION];
+  const started = Date.now();
+  let last;
+  for (let attempt = 0; attempt < locations.length; attempt++) {
+    if (attempt) await sleep(Math.min(400 * 2 ** (attempt - 1), 2500));
+    const headers = { 'Content-Type': 'application/json' };
+    if (mode === 'api-key') headers['x-goog-api-key'] = API_KEY;
+    else if (mode === 'vertex-key') headers['x-goog-api-key'] = VERTEX_KEY;
+    else headers.Authorization = `Bearer ${await accessToken()}`;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), Math.max(timeoutMs - (Date.now() - started), 5_000));
+    try {
+      const res = await fetch(endpoint(useModel, locations[attempt]), { method: 'POST', headers, body: JSON.stringify(body), signal: ctrl.signal });
+      const text = await res.text();
+      if (BUSY.has(res.status)) {
+        last = Object.assign(new Error(`Gemini busy (${res.status})`), { status: 503 });
+        continue;
+      }
+      if (!res.ok) throw Object.assign(new Error(`Gemini ${res.status}: ${text.slice(0, 400)}`), { status: 502 });
+      const json = JSON.parse(text);
+      const content = json.candidates?.[0]?.content;
+      if (!content?.parts?.length) throw Object.assign(new Error(`Gemini returned no content (${json.candidates?.[0]?.finishReason ?? 'unknown'})`), { status: 502 });
+      return content;
+    } catch (e) {
+      if (e.name === 'AbortError') throw Object.assign(new Error('Gemini timed out'), { status: 503 });
+      throw e;
+    } finally {
+      clearTimeout(timer);
+    }
   }
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal: ctrl.signal });
-    const text = await res.text();
-    if (!res.ok) throw Object.assign(new Error(`Gemini ${res.status}: ${text.slice(0, 400)}`), { status: 502 });
-    const json = JSON.parse(text);
-    const content = json.candidates?.[0]?.content;
-    if (!content?.parts?.length) throw Object.assign(new Error(`Gemini returned no content (${json.candidates?.[0]?.finishReason ?? 'unknown'})`), { status: 502 });
-    return content;
-  } finally {
-    clearTimeout(timer);
-  }
+  throw last;
 }
 
 /** Calls Gemini in JSON mode and parses the reply. */
