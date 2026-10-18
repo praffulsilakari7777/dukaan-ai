@@ -88,7 +88,7 @@ const SCENES = [
     id: 'voice',
     vo: 'Recording a sale takes seconds. Ramesh simply says it, in Hinglish, the way he talks at the counter. Gemini turns his words into structured ledger entries and shows them as cards. Nothing is saved until he confirms.',
     async run({ stage, app }) {
-      await stage('caption', { step: '02 · Speak, don’t type', title: 'Say it the way<br>you say it.', body: 'Hindi, Hinglish, English and five more Indian languages. The AI proposes, the owner approves.', tags: ['<b>Gemini</b> understanding', 'Confirm before save'] });
+      await stage('caption', { step: '02 · Speak, don’t type', title: 'Say it the way<br>you say it.', body: 'English and eleven Indian languages, from Hindi to Tamil. The AI proposes, the owner approves.', tags: ['<b>Gemini</b> understanding', 'Confirm before save'] });
       await wait(600);
       await app.getByRole('button', { name: 'Add', exact: true }).click();
       await wait(900);
@@ -167,14 +167,19 @@ const SCENES = [
       await wait(1800);
       await app.getByRole('button', { name: /Create offer with AI/ }).first().click();
       await app.locator('.poster-frame img').waitFor({ timeout: 60_000 });
-      await wait(1800);
       if (GEMINI) {
+        // Start the Gemini image straight away so it renders while the narration runs.
+        await wait(900);
         await app.locator('.poster-seg button').nth(1).click();
         await app.locator('.poster-frame img').waitFor({ timeout: 95_000 });
-        await wait(2500);
-      } else await wait(800);
-      await app.locator('.sheet-body').evaluate((el) => el.scrollTo({ top: 420, behavior: 'smooth' }));
-      await wait(2200);
+        await wait(4500);
+        await app.locator('.sheet-body').evaluate((el) => el.scrollTo({ top: 300, behavior: 'smooth' }));
+        await wait(2400);
+      } else {
+        await wait(2600);
+        await app.locator('.sheet-body').evaluate((el) => el.scrollTo({ top: 420, behavior: 'smooth' }));
+        await wait(2200);
+      }
       await app.getByRole('button', { name: /Start offer/ }).click();
       await wait(1200);
     },

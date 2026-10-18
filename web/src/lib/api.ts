@@ -82,10 +82,10 @@ function matchItem(name: string, items: string[]) {
   return hits.length === 1 ? hits[0] : name;
 }
 
-export async function scanBill(dataUrl: string) {
+export async function scanBill(dataUrl: string, items: string[] = []) {
   const [meta, image] = dataUrl.split(',');
   const mime = meta.match(/data:(.*?);/)?.[1] ?? 'image/jpeg';
-  const r = await post<{ supplier?: string; entries: RawEntry[] }>('scan', { image, mime }, 45_000);
+  const r = await post<{ supplier?: string; entries: RawEntry[] }>('scan', { image, mime, items }, 45_000);
   return { supplier: r.supplier, drafts: toDrafts(r.entries.map((e) => ({ ...e, type: 'purchase' as const, supplier: r.supplier }))) };
 }
 

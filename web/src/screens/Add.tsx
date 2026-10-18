@@ -73,7 +73,7 @@ export function AddSheet({ onClose }: { onClose: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      const r = await scanBill(photo);
+      const r = await scanBill(photo, ledger.stock.map((s) => s.name));
       if (!r.drafts.length) setError("Couldn't read any items on this bill. Try a clearer, flatter photo.");
       else {
         setDrafts(r.drafts);

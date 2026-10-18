@@ -14,8 +14,8 @@ const LINES: [string, number, string, number, number][] = [
 
 /** Draws a wholesaler bill on a canvas, slightly rotated like a phone photo. */
 export function drawSampleBill(): string {
-  const W = 900;
-  const H = 1200;
+  const W = 1100;
+  const H = 1300;
   const c = document.createElement('canvas');
   c.width = W;
   c.height = H;
@@ -24,7 +24,7 @@ export function drawSampleBill(): string {
   g.fillRect(0, 0, W, H);
   g.save();
   g.translate(W / 2, H / 2);
-  g.rotate(-0.025);
+  g.rotate(-0.012);
   g.translate(-W / 2, -H / 2);
   g.fillStyle = '#fbf8f1';
   g.shadowColor = 'rgba(0,0,0,.35)';
@@ -52,7 +52,7 @@ export function drawSampleBill(): string {
   g.textAlign = 'left';
   g.fillText('To: Sharma Kirana Store', 110, 354);
 
-  const cols = [110, 470, 600, 720, W - 110];
+  const cols = [120, 470, 640, 790, W - 120];
   g.strokeStyle = ink;
   g.lineWidth = 2;
   g.beginPath();
@@ -68,7 +68,7 @@ export function drawSampleBill(): string {
   g.fillText('Rate', cols[3] - 10, 410);
   g.fillText('Amount', cols[4], 410);
 
-  g.font = '24px "Courier New", monospace';
+  g.font = 'bold 27px Menlo, "DejaVu Sans Mono", monospace';
   let y = 470;
   let total = 0;
   for (const [name, qty, unit, rate, amt] of LINES) {
@@ -98,7 +98,7 @@ export function drawSampleBill(): string {
   g.textAlign = 'right';
   g.fillText('for Agarwal Traders', W - 120, H - 150);
   g.restore();
-  return c.toDataURL('image/jpeg', 0.88);
+  return c.toDataURL('image/jpeg', 0.95);
 }
 
 /** What the sample bill contains, used when Gemini can't be reached. */

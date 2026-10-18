@@ -93,11 +93,11 @@ export async function generate(body, { timeoutMs = 40_000, model: useModel = MOD
 }
 
 /** Calls Gemini in JSON mode and parses the reply. */
-export async function generateJSON({ system, parts, schema, temperature = 0.2 }) {
+export async function generateJSON({ system, parts, schema, temperature = 0.2, thinkingBudget = 0, extra = {} }) {
   const content = await generate({
     systemInstruction: { parts: [{ text: system }] },
     contents: [{ role: 'user', parts }],
-    generationConfig: { temperature, responseMimeType: 'application/json', responseSchema: schema, thinkingConfig: { thinkingBudget: 0 } },
+    generationConfig: { temperature, responseMimeType: 'application/json', responseSchema: schema, thinkingConfig: { thinkingBudget }, ...extra },
   });
   const text = content.parts.map((p) => p.text ?? '').join('');
   return JSON.parse(text);

@@ -151,19 +151,35 @@ const routes = {
 
   async 'POST /api/scan'(b) {
     if (!b.image) throw Object.assign(new Error('image required'), { status: 400 });
+    const known = (b.items || []).slice(0, 80).join(', ');
     const out = await generateJSON({
       system: SCAN_SYSTEM,
-      parts: [{ inlineData: { mimeType: b.mime || 'image/jpeg', data: b.image } }, { text: 'Extract the purchased items from this bill.' }],
+      parts: [
+        { inlineData: { mimeType: b.mime || 'image/jpeg', data: b.image } },
+        { text: `Extract the purchased items from this bill.${known ? ` The shop already stocks: ${known}. When a line is one of these, use exactly that name (e.g. "Maggi Noodles" → "Maggi").` : ''} For each line also read the per-unit rate, and check that quantity × rate equals the line amount.` },
+      ],
       schema: {
         type: 'OBJECT',
         properties: {
           supplier: { type: 'STRING', nullable: true },
-          entries: { type: 'ARRAY', items: { type: 'OBJECT', properties: { item: { type: 'STRING' }, qty: { type: 'NUMBER' }, unit: { type: 'STRING' }, amount: { type: 'NUMBER' } }, required: ['item', 'amount'] } },
+          entries: {
+            type: 'ARRAY',
+            items: { type: 'OBJECT', properties: { item: { type: 'STRING' }, qty: { type: 'NUMBER' }, unit: { type: 'STRING' }, rate: { type: 'NUMBER', nullable: true, description: 'Price per unit' }, amount: { type: 'NUMBER', description: 'Line total' } }, required: ['item', 'amount'] },
+          },
         },
         required: ['entries'],
       },
+      // Reading small printed digits benefits from full resolution and a moment to check the sums.
+      temperature: 0,
+      thinkingBudget: 2048,
+      extra: { mediaResolution: 'MEDIA_RESOLUTION_HIGH' },
     });
-    return { supplier: out.supplier, entries: (out.entries || []).map((e) => ({ ...e, type: 'purchase' })) };
+    // Digits on photos get misread; when the rate and quantity agree with each other, trust them over the total.
+    const entries = (out.entries || []).map(({ rate, ...e }) => {
+      if (rate && e.qty && Math.abs(rate * e.qty - e.amount) > Math.max(2, e.amount * 0.02)) return { ...e, amount: Math.round(rate * e.qty * 100) / 100, type: 'purchase' };
+      return { ...e, type: 'purchase' };
+    });
+    return { supplier: out.supplier, entries };
   },
 
   async 'POST /api/agent'(b) {
