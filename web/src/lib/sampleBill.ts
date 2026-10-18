@@ -4,12 +4,12 @@ import type { Draft } from './types';
 export const SAMPLE_SUPPLIER = 'Agarwal Traders';
 
 const LINES: [string, number, string, number, number][] = [
-  ['Sugar (Cheeni)', 25, 'kg', 42, 1050],
   ['Toor Dal', 10, 'kg', 118, 1180],
-  ['Mustard Oil', 12, 'L', 138, 1656],
-  ['Maggi Noodles', 48, 'pkt', 12, 576],
+  ['Mustard Oil (Sarson)', 12, 'L', 138, 1656],
   ['Tea (Chai Patti)', 5, 'kg', 355, 1775],
-  ['Detergent', 10, 'kg', 88, 880],
+  ['Detergent Powder', 10, 'kg', 88, 880],
+  ['Glucose Biscuits', 60, 'pkt', 10, 600],
+  ['Bath Soap', 24, 'pc', 30, 720],
 ];
 
 /** Draws a wholesaler bill on a canvas, slightly rotated like a phone photo. */
@@ -92,7 +92,7 @@ export function drawSampleBill(): string {
   g.fillText(`₹ ${total.toLocaleString('en-IN')}.00`, cols[4], y + 22);
   g.font = 'italic 22px Georgia, serif';
   g.textAlign = 'left';
-  g.fillText('Seven thousand one hundred seventeen only', cols[0], y + 70);
+  g.fillText('Six thousand eight hundred eleven only', cols[0], y + 70);
 
   g.font = 'italic 34px "Brush Script MT", cursive';
   g.textAlign = 'right';
@@ -103,6 +103,6 @@ export function drawSampleBill(): string {
 
 /** What the sample bill contains, used when Gemini can't be reached. */
 export function sampleBillDrafts(): Draft[] {
-  const names = ['Sugar', 'Toor Dal', 'Mustard Oil', 'Maggi', 'Tea', 'Detergent'];
+  const names = ['Toor Dal', 'Mustard Oil', 'Tea', 'Detergent', 'Biscuits', 'Soap'];
   return LINES.map(([, qty, unit, , amt], i) => ({ key: uid(), type: 'purchase', item: names[i], qty, unit, amount: amt, supplier: SAMPLE_SUPPLIER }));
 }

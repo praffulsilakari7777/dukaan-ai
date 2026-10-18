@@ -112,7 +112,8 @@ export const TOOLS: Record<string, (args: any, ctx: Ctx) => ToolOut> = {
   draft_supplier_order({ supplier = 'Supplier', items = [], message }: { supplier?: string; items?: { item: string; qty: number; unit?: string }[]; message?: string }, { settings, ledger }) {
     let lines = items;
     if (!lines.length) lines = ledger.stock.filter((s) => s.low).map((s) => ({ item: s.name, qty: Math.max(Math.ceil(s.velocity * 10 - Math.max(s.qty, 0)), 5), unit: s.unit }));
-    const text = message?.trim() || `Namaste ${supplier} ji, ${settings.shopName} se order:\n${lines.map((l) => `• ${l.item} – ${fmtQty(l.qty, l.unit)}`).join('\n')}\nKripya kal tak bhej dijiye. Dhanyavaad!`;
+    // A bare "Sugar 29 kg" is not a message a supplier should receive; wrap it politely.
+    const text = (message?.trim().length ?? 0) >= 40 ? message!.trim() : `Namaste ${supplier} ji, ${settings.shopName} se order:\n${lines.map((l) => `• ${l.item} – ${fmtQty(l.qty, l.unit)}`).join('\n')}\nKripya kal tak bhej dijiye. Dhanyavaad!`;
     return { result: { drafted: true, supplier, lines: lines.length }, summary: `order for ${lines.length} item${lines.length === 1 ? '' : 's'}`, drafts: [{ kind: 'order', to: supplier, text }] };
   },
 
