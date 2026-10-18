@@ -205,10 +205,29 @@ const SCENES = [
     },
   },
   {
+    id: 'whatsapp',
+    vo: 'And because shop owners live on WhatsApp, Dukaan AI works there too. A voice note becomes a confirmed entry, and a photo of a bill becomes stock, with no app to install.',
+    async run({ stage, app }) {
+      await stage('caption', { step: '08 · On WhatsApp', title: 'No app to install.<br>Just send a voice note.', body: 'The same Gemini pipeline behind a chat: voice notes become entries, bill photos become stock, questions get answers.', tags: ['Voice notes', 'Bill photos', 'Confirm with one tap'] });
+      await app.locator('.nav').getByRole('button', { name: 'Home' }).click();
+      await wait(900);
+      await app.locator('.wa-try').click();
+      await wait(1400);
+      await app.locator('.wa-chips button').nth(0).click();
+      await app.locator('.wa-quick').first().waitFor({ timeout: 60_000 });
+      await wait(1800);
+      await app.locator('.wa-quick button').first().click();
+      await wait(1400);
+      await app.locator('.wa-chips button').nth(1).click();
+      await app.locator('.wa-quick').first().waitFor({ timeout: 90_000 });
+      await wait(2500);
+    },
+  },
+  {
     id: 'lang',
     vo: "Dukaan AI speaks the owner's language. The whole app, voice input, and every Gemini answer switch between English and eleven Indian languages, from Hindi and Bengali to Tamil and Malayalam, with a single tap.",
     async run({ stage, app }) {
-      await stage('caption', { step: '08 · Built for Bharat', title: 'Twelve languages,<br>one tap.', body: 'Hindi, Hinglish, Bengali, Telugu, Marathi, Tamil, Gujarati, Kannada, Malayalam, Punjabi, Odia and English.', tags: ['Native scripts', 'Voice in every language', '<b>Gemini</b> answers in kind'] });
+      await stage('caption', { step: '09 · Built for Bharat', title: 'Twelve languages,<br>one tap.', body: 'Hindi, Hinglish, Bengali, Telugu, Marathi, Tamil, Gujarati, Kannada, Malayalam, Punjabi, Odia and English.', tags: ['Native scripts', 'Voice in every language', '<b>Gemini</b> answers in kind'] });
       await app.locator('.nav').getByRole('button', { name: 'Home' }).click();
       await wait(1200);
       const pick = async (native) => {
@@ -244,7 +263,7 @@ const SCENES = [
     id: 'outro',
     vo: "Next come a WhatsApp bot, GST invoicing, and real lending partners. Dukaan AI. It listens, it keeps the books, and it helps India's small shops get credit.",
     async run({ stage }) {
-      await stage('card', { title: 'Dukaan AI', sub: 'It listens. It keeps the books.<br>It helps India’s kirana stores get credit.', stats: [['Gemini', 'agent, vision & insights'], ['Cloud Run', 'deployed backend'], ['Next', 'WhatsApp bot · GST · NBFC partners']], foot: 'Google Cloud AI Builder Cup 2026 · Theme 2: Retail &amp; Commerce' });
+      await stage('card', { title: 'Dukaan AI', sub: 'It listens. It keeps the books.<br>It helps India’s kirana stores get credit.', stats: [['Gemini', 'agent, vision & insights'], ['Cloud Run', 'deployed backend'], ['Next', 'WhatsApp bot · GST · NBFC partners']], foot: 'Try it: <b>dukaan-ai-633400982.asia-south1.run.app</b> · Code: <b>github.com/praffulsilakari7777/dukaan-ai</b>' });
     },
   },
 ];
@@ -263,6 +282,8 @@ for (const s of SCENES) {
 
 const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 });
+// The first-run tour is for real visitors; the film starts inside the app.
+await ctx.addInitScript(() => { try { localStorage.setItem('dukaan-ai:tour', 'done'); } catch {} });
 const page = await ctx.newPage();
 await page.goto(`file://${join(HERE, 'stage.html')}`);
 await page.evaluate((url) => {
