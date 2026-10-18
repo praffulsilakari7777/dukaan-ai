@@ -242,8 +242,12 @@ Rules: expiring stock should be cleared before the date, so price it to sell in 
       const oldPct = plan.discount_pct;
       plan.offer_price = floor;
       plan.discount_pct = c.price ? Math.max(Math.round(((c.price - floor) / c.price) * 100), 0) : plan.discount_pct;
-      const fix = (t) => t && t.replaceAll(`₹${oldPrice}`, `₹${floor}`).replaceAll(`${oldPct}%`, `${plan.discount_pct}%`);
-      for (const k of ['headline', 'whatsapp_message', 'poster_tagline', 'reasoning']) plan[k] = fix(plan[k]);
+      // Words like "half price" or "50%" no longer match the clamped price, so restate them.
+      const vague = /half[\s-]*price|aadhe[\s-]*daam|aadha|buy one get one|bogo|free/i;
+      const fix = (t) => t && t.replaceAll(`₹${oldPrice}`, `₹${floor}`).replaceAll(`${oldPct}%`, `${plan.discount_pct}%`).replace(vague, `${plan.discount_pct}% off`);
+      for (const k of ['whatsapp_message', 'poster_tagline', 'reasoning']) plan[k] = fix(plan[k]);
+      plan.headline = `${plan.discount_pct}% off ${c.item}`;
+      plan.offer_type = 'discount';
     }
     return plan;
   },

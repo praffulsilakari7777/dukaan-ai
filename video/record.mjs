@@ -71,9 +71,9 @@ async function synth(text, file) {
 const SCENES = [
   {
     id: 'intro',
-    vo: "India has more than thirteen million kirana stores. Most still keep their accounts in a paper notebook. Owners can't see their real profit, they lose track of credit, and without records, banks won't lend to them.",
+    vo: "Across India, millions of neighbourhood kirana stores still keep their accounts in a paper notebook. Owners can't see their real profit, they lose track of credit, and without records, banks won't lend to them.",
     async run({ stage }) {
-      await stage('card', { title: 'Dukaan AI', sub: 'An AI employee for India’s kirana stores', stats: [['13M+', 'kirana stores in India'], ['Paper', 'how most keep accounts'], ['No credit', 'without formal records']], foot: 'Built with <b>Gemini</b> on <b>Google Cloud Run</b>' });
+      await stage('card', { title: 'Dukaan AI', sub: 'An AI employee for India’s kirana stores', stats: [['Paper', 'how most shops keep accounts'], ['Udhaar', 'credit that goes uncollected'], ['No credit', 'without formal records']], foot: 'Built with <b>Gemini</b> on <b>Google Cloud Run</b>' });
     },
   },
   {
@@ -302,7 +302,8 @@ const stage = (fn, arg) => page.evaluate(([f, a]) => window.stage[f](a), [fn, ar
 const cdp = await ctx.newCDPSession(page);
 const frames = [];
 cdp.on('Page.screencastFrame', async ({ data, metadata, sessionId }) => {
-  frames.push({ data, t: metadata.timestamp });
+  // Wall-clock arrival time: Chrome's own frame timestamps can drift from Date.now().
+  frames.push({ data, t: Date.now() / 1000 });
   cdp.send('Page.screencastFrameAck', { sessionId }).catch(() => {});
 });
 await stage('card', { title: 'Dukaan AI', sub: 'An AI employee for India’s kirana stores' });
@@ -326,31 +327,50 @@ const tEnd = Date.now() / 1000;
 await cdp.send('Page.stopScreencast');
 await browser.close();
 
-// Frames → constant 30fps video.
-const startT = frames.find((f) => f.t >= t0)?.t ?? frames[0].t;
-const used = frames.filter((f) => f.t >= startT - 0.001);
-const end = Math.max(used[used.length - 1].t + 0.5, tEnd);
+// Timeline: each scene keeps its narration at real speed; anything after the narration
+// that only waits on the network (a poster rendering, a bill scan) is time-lapsed so the
+// film stays under three minutes.
+const scenes = marks.map((m, i) => ({ ...m, end: i + 1 < marks.length ? marks[i + 1].start : tEnd - t0, vo: SCENES[i].seconds }));
+let cursor = 0;
+for (const sc of scenes) {
+  const len = sc.end - sc.start;
+  const keep = Math.min(len, sc.vo + 0.6);
+  const allowed = sc.vo + 2.2;
+  const rest = len - keep;
+  const newRest = len > allowed ? Math.max(allowed - keep, 1) : rest;
+  Object.assign(sc, { newStart: cursor, keep, factor: rest > 0 ? rest / newRest : 1 });
+  cursor += keep + newRest;
+}
+const total = cursor;
+const mapT = (abs) => {
+  const t = abs - t0;
+  if (t <= 0) return 0;
+  const sc = scenes.find((x) => t >= x.start && t < x.end) ?? scenes[scenes.length - 1];
+  const d = Math.min(t - sc.start, sc.end - sc.start);
+  return sc.newStart + (d <= sc.keep ? d : sc.keep + (d - sc.keep) / sc.factor);
+};
+const used = [frames.filter((f) => f.t < t0).pop() ?? frames[0], ...frames.filter((f) => f.t >= t0)].map((f) => ({ ...f, m: mapT(f.t) }));
 let list = '';
 used.forEach((f, i) => {
   const name = `f${String(i).padStart(6, '0')}.jpg`;
   writeFileSync(join(FRAMES, name), Buffer.from(f.data, 'base64'));
-  const next = i + 1 < used.length ? used[i + 1].t : end;
-  list += `file '${name}'\nduration ${Math.max(next - f.t, 0.001).toFixed(4)}\n`;
+  const next = i + 1 < used.length ? used[i + 1].m : total;
+  list += `file '${name}'\nduration ${Math.max(next - f.m, 0.001).toFixed(4)}\n`;
 });
 list += `file 'f${String(used.length - 1).padStart(6, '0')}.jpg'\n`;
 writeFileSync(join(FRAMES, 'list.txt'), list);
 const silent = join(OUT, 'silent.mp4');
 ff(['-f', 'concat', '-safe', '0', '-i', join(FRAMES, 'list.txt'), '-vf', 'fps=30,format=yuv420p', '-c:v', 'libx264', '-preset', 'slow', '-crf', '18', silent]);
 
-// Voice clips placed at each scene's start.
-const offset = startT - t0;
-const inputs = marks.flatMap((m) => ['-i', m.wav]);
-const delays = marks.map((m, i) => `[${i}:a]adelay=${Math.max(Math.round((m.start - offset + 0.35) * 1000), 0)}|${Math.max(Math.round((m.start - offset + 0.35) * 1000), 0)}[a${i}]`).join(';');
-const mix = `${delays};${marks.map((_, i) => `[a${i}]`).join('')}amix=inputs=${marks.length}:normalize=0,apad[aout]`;
+// Voice clips placed at each scene's (re-timed) start.
+const inputs = scenes.flatMap((m) => ['-i', m.wav]);
+const delays = scenes.map((m, i) => { const ms = Math.round((m.newStart + 0.35) * 1000); return `[${i}:a]adelay=${ms}|${ms}[a${i}]`; }).join(';');
+const mix = `${delays};${scenes.map((_, i) => `[a${i}]`).join('')}amix=inputs=${scenes.length}:normalize=0,apad[aout]`;
 const voice = join(OUT, 'voice.wav');
-ff([...inputs, '-filter_complex', mix, '-map', '[aout]', '-t', String(end - startT), '-ar', '48000', voice]);
+ff([...inputs, '-filter_complex', mix, '-map', '[aout]', '-t', String(total), '-ar', '48000', voice]);
 
 const final = join(OUT, 'dukaan-ai-demo.mp4');
 ff(['-i', silent, '-i', voice, '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-shortest', '-movflags', '+faststart', final]);
 rmSync(FRAMES, { recursive: true, force: true });
-console.log(`\nDone: ${final} (${(end - startT).toFixed(1)}s, ${used.length} frames)`);
+console.log(`\nDone: ${final} (${total.toFixed(1)}s, ${used.length} frames)`);
+for (const sc of scenes) console.log(`  ${sc.id.padEnd(9)} real ${(sc.end - sc.start).toFixed(1)}s -> ${(sc.keep + (sc.end - sc.start - sc.keep) / sc.factor).toFixed(1)}s`);
