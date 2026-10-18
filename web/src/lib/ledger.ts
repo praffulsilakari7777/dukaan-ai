@@ -244,13 +244,14 @@ export const fmtQty = (qty?: number, unit?: string) => {
   return `${q} ${unit ?? ''}`.trim();
 };
 
-export const relTime = (ts: number, now = Date.now()) => {
+export const relTime = (ts: number, locale = 'en-IN', now = Date.now()) => {
   const diff = now - ts;
-  if (diff < 60_000) return 'just now';
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)} min ago`;
-  if (ts >= startOfDay(now)) return new Date(ts).toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
-  if (ts >= startOfDay(now) - DAY) return 'Yesterday';
-  return new Date(ts).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto', style: 'short' });
+  if (diff < 60_000) return rtf.format(0, 'minute');
+  if (diff < 3_600_000) return rtf.format(-Math.floor(diff / 60_000), 'minute');
+  if (ts >= startOfDay(now)) return new Date(ts).toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' });
+  if (ts >= startOfDay(now) - DAY) return rtf.format(-1, 'day');
+  return new Date(ts).toLocaleDateString(locale, { day: 'numeric', month: 'short' });
 };
 
 export const daysSince = (ts: number, now = Date.now()) => (ts ? Math.floor((now - ts) / DAY) : Infinity);

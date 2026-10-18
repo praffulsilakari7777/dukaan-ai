@@ -196,7 +196,7 @@ const routes = {
 
   async 'POST /api/insights'(b) {
     return generateJSON({
-      system: `You are a small-business advisor and credit analyst for Indian kirana shops. Use only the numbers given. Write in ${langName(b.lang)} that a shopkeeper understands. No jargon. Keep numbers as digits.`,
+      system: `You are a small-business advisor and credit analyst for Indian kirana shops. Use only the numbers given. Write in ${langName(b.lang)} that a shopkeeper understands. No jargon. Write money as ₹ with Indian digit grouping (₹3,080, ₹40,000), never as "rupees".`,
       parts: [
         {
           text: `Shop data (JSON): ${JSON.stringify(b.summary)}

@@ -296,7 +296,7 @@ export function Home({ go, openAdd, openAsk, openSettings, openLang }: { go: (t:
                         <div className="main">
                           <div className="t">{entryTitle(e)}</div>
                           <div className="s">
-                            {relTime(e.ts)}
+                            {relTime(e.ts, langInfo(settings.lang).bcp)}
                             {e.type === 'sale' && e.credit ? ` · udhaar · ${e.customer}` : e.supplier ? ` · ${e.supplier}` : ''}
                             {e.source === 'voice' ? ' · voice' : e.source === 'bill' ? ' · bill scan' : e.source === 'agent' ? ' · Ask Dukaan' : ''}
                           </div>

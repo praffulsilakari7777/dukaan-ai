@@ -607,8 +607,9 @@ a.btn { text-decoration: none; }
 
 .ask-card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 18px; display: flex; flex-direction: column; }
 .ask-head { display: flex; align-items: center; gap: 12px; }
+.ask-head > div { min-width: 0; }
 .ask-head div b { display: block; font-size: 15px; font-weight: 700; }
-.ask-head div span { display: block; font-size: 12.5px; color: var(--ink-3); }
+.ask-head div span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12.5px; color: var(--ink-3); }
 .ask-orb { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; color: #fff; flex: none; background: radial-gradient(circle at 30% 25%, var(--brand-400), var(--brand) 60%, var(--brand-900)); }
 .ask-input { display: flex; gap: 8px; margin-top: 14px; }
 .ask-field { flex: 1; min-width: 0; height: 48px; border-radius: 14px; background: var(--bg); border: 1px solid var(--line); text-align: left; padding: 0 16px; color: var(--ink-3); font-size: 14.5px; transition: border-color 0.15s, box-shadow 0.15s; }
@@ -631,9 +632,9 @@ a.btn { text-decoration: none; }
 .attn-main { flex: 1; min-width: 0; }
 .attn-main b { display: block; font-size: 14px; font-weight: 600; }
 .attn-main > span { display: block; font-size: 12.5px; color: var(--ink-3); margin-top: 1px; }
-.attn-act { height: 34px; padding: 0 14px; border-radius: 10px; background: var(--ink); color: #fff; font-size: 13px; font-weight: 700; flex: none; transition: background 0.15s; }
-.attn-act:hover { background: var(--brand-900); }
-.attn-act.icon { width: 34px; padding: 0; display: grid; place-items: center; background: var(--brand); }
+.attn-act { height: 34px; padding: 0 14px; border-radius: 10px; background: var(--brand-50); color: var(--brand-900); box-shadow: inset 0 0 0 1px var(--brand-100); font-size: 13px; font-weight: 700; flex: none; transition: background 0.15s, color 0.15s; }
+.attn-act:hover { background: var(--brand); color: #fff; box-shadow: none; }
+.attn-act.icon { width: 34px; padding: 0; display: grid; place-items: center; }
 .brief-script { margin: 2px 0 6px; padding: 12px 14px; border-radius: 12px; background: var(--bg); font-size: 13.5px; color: var(--ink-2); }
 
 .chart-sel { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-top: 2px; }

@@ -4,12 +4,12 @@ import { initials, Sheet } from '../components/ui';
 import { waLink } from '../lib/agent';
 import { daysSince, inr, relTime } from '../lib/ledger';
 import { useStore } from '../lib/store';
-import { tf } from '../lib/i18n';
+import { langInfo, tf } from '../lib/i18n';
 import { useWide } from '../lib/useWide';
 import type { Customer } from '../lib/types';
 
 export function Khata() {
-  const { ledger, t } = useStore();
+  const { ledger, t, settings } = useStore();
   const wide = useWide();
   const [open, setOpen] = useState<string | null>(null);
   const owing = ledger.customers.filter((c) => c.due > 0);
@@ -50,7 +50,7 @@ export function Khata() {
                       <div className="main">
                         <div className="t">{c.name}</div>
                         <div className="s">
-                          {c.lastPaymentTs ? `${t.lastPaid} ${relTime(c.lastPaymentTs).toLowerCase()}` : c.due > 0 ? `${t.neverPaid} · ${since}` : t.clear}
+                          {c.lastPaymentTs ? `${t.lastPaid} ${relTime(c.lastPaymentTs, langInfo(settings.lang).bcp)}` : c.due > 0 ? `${t.neverPaid} · ${tf(t.overdueDays, { n: since })}` : t.clear}
                         </div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
@@ -164,9 +164,10 @@ function CustomerDetail({ c }: { c: Customer }) {
                 <div className="t">{h.kind === 'payment' ? t.jama : h.label}</div>
                 <div className="s">{new Date(h.ts).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
               </div>
-              <div className={`amt num ${h.kind === 'payment' ? 'in' : 'out'}`}>
-                {h.kind === 'payment' ? '−' : '+'}
+              <div className={`amt num ${h.kind === 'payment' ? 'in' : ''}`}>
+                {h.kind === 'payment' ? '+' : ''}
                 {inr(h.amount)}
+                <div className="amt-sub">{h.kind === 'payment' ? t.jama : t.udhaarSale}</div>
               </div>
             </li>
           ))}
